@@ -26,6 +26,7 @@ const DEFAULT_CATEGORY_CHANGE_COST : number = 0.6; // Default cost for category 
 const LOSSY_COST_MULTIPLIER : number = 1.4; // Cost multiplier for lossy conversions. Higher values will make the algorithm prefer lossless conversions more strongly.
 const HANDLER_PRIORITY_COST : number = 0.02; // Cost multiplier for handler priority. Higher values will make the algorithm prefer handlers with higher priority more strongly.
 const FORMAT_PRIORITY_COST : number = 0.05; // Cost multiplier for format priority. Higher values will make the algorithm prefer formats with higher priority more strongly.
+const ANY_INPUT_COST : number = 2; // Extra cost for edges created via supportAnyInput. Discourages generic "pack" conversions so the algorithm prefers more specific conversion paths (e.g. rename-then-convert over wrapping a file as-is).
 
 const LOG_FREQUENCY = 1000;
 
@@ -212,7 +213,7 @@ export class TraversionGraph {
                         strictCategories,
                         handler.name,
                         hIndex
-                    );
+                    ) + ANY_INPUT_COST;
                     this.edges.push({
                         from: { format: fromNode.format, index: fromIndex },
                         to: { format: to.format, index: to.index },
