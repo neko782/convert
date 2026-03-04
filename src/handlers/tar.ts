@@ -5,10 +5,7 @@ import CommonFormats from "src/CommonFormats.ts";
 
 import {
   createTar,
-  createTarGzip,
-  createTarGzipStream,
   parseTar,
-  parseTarGzip,
   type TarFileItem,
 } from "nanotar";
 import JSZip from "jszip";
@@ -17,17 +14,7 @@ class tarHandler implements FormatHandler {
 
   public name: string = "tar";
   public supportedFormats?: FileFormat[] = [
-    {
-      name: "Tape Archive",
-      format: "tar",
-      extension: "tar",
-      mime: "application/x-tar",
-      from: true,
-      to: true,
-      internal: "tar",
-      category: ["archive"],
-      lossless: true
-    },
+    CommonFormats.TAR.builder("tar").allowFrom().allowTo().markLossless(),
     CommonFormats.ZIP.builder("zip").allowFrom().allowTo().markLossless()
   ];
 
