@@ -28,8 +28,8 @@
 				display: flex;
 				font-weight: 900;
 				align-items: center;
-				gap: .3em;
-				font-size: 1.25rem;
+				gap: .5em;
+				font-size: 2rem;
 				color: var(--text-primary);
 
 
@@ -104,7 +104,7 @@
 				background-color: var(--btn-bg-primary);
 				color: var(--text-inverse);
 				font-weight: 600;
-				padding: 0.5rem 1.5rem;
+				padding: 0.5rem 1rem;
 				border-radius: 8px;
 				border: none;
 				box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -135,7 +135,7 @@
 				appearance: none;
 				border: .1rem solid var(--btn-border);
 				border-radius: 8px;
-				padding: .75em;
+				padding: .75em 1.2em;
 				color: var(--text-muted);
 				background: var(--btn-bg-card);
 				transition: color 150ms, background 150ms;
