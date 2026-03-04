@@ -2,7 +2,8 @@
 
 import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 import CommonFormats from "src/CommonFormats.ts";
-import { gzipSync, gunzipSync } from "fflate";
+import { gzipSync as gzip, gunzipSync as gunzip } from "fflate";
+import { decompress as unzstd } from "fzstd";
 
 class tarCompressedHandler implements FormatHandler {
 
@@ -17,6 +18,17 @@ class tarCompressedHandler implements FormatHandler {
       from: true,
       to: true,
       internal: "tar.gz",
+      category: "archive",
+      lossless: true
+    },
+    {
+      name: "Zstd compressed Tape Archive",
+      format: "tar.zst",
+      extension: "zst",
+      mime: "application/zstd",
+      from: true, 
+      to: false,
+      internal: "tar.zst",
       category: "archive",
       lossless: true
     },
@@ -37,7 +49,7 @@ class tarCompressedHandler implements FormatHandler {
       switch (outputFormat.internal) {
         case "tar.gz":
           for (const inputFile of inputFiles) { 
-            const gzipped = gzipSync(inputFile.bytes);
+            const gzipped = gzip(inputFile.bytes);
             outputFiles.push({ bytes: gzipped, name: inputFile.name + ".gz" });
           }
           break;
@@ -46,12 +58,21 @@ class tarCompressedHandler implements FormatHandler {
       switch (inputFormat.internal) {
         case "tar.gz":
           for (const inputFile of inputFiles) { 
-            const tar = gunzipSync(inputFile.bytes);
-            outputFiles.push({ bytes: tar, name: inputFile.name + ".gz" });
+            const tar = gunzip(inputFile.bytes);
+            outputFiles.push({ bytes: tar, name: inputFile.name.replace(/\.gz$/i, "") });
+          }
+          break;
+        case "tar.zst":
+          for (const inputFile of inputFiles) { 
+            const tar = unzstd(inputFile.bytes);
+            outputFiles.push({ bytes: tar, name: inputFile.name.replace(/\.zst$/i, "") });
           }
           break;
       }
+    } else {
+      throw "tarCompressedHandler cannot process this conversion";
     }
+
     return outputFiles;
   }
 
