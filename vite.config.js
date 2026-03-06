@@ -57,7 +57,11 @@ export default defineConfig({
         {
           src: "src/handlers/espeakng.js/js/espeakng.worker.data",
           dest: "js"
-        }
+        },
+        {
+          src: "src/handlers/tarCompressed/liblzma.wasm",
+          dest: "wasm"
+        },
       ]
     }),
     tsconfigPaths()
