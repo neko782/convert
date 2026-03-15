@@ -38,6 +38,13 @@ function csharp(text: string): string {
   return `using System;\n\nConsole.WriteLine(@"${text}");\n\nConsole.Read();\n`;
 }
 
+function rust(text: string): string {
+  let count = 0;
+  while (text.includes(`"${'#'.repeat(count)}`)) { count++; }
+  const hashtags = '#'.repeat(count);
+  return `fn main() { println!("{}", r${hashtags}"${text}"${hashtags}); }`;
+}
+
 class textToSourceHandler implements FormatHandler {
 
   static converters: [FileFormat, (text: string) => string][] = [
@@ -66,6 +73,17 @@ class textToSourceHandler implements FormatHandler {
       category: "code",
       lossless: true,
     }, csharp],
+    [{
+      name: "Rust Source File",
+      format: "rs",
+      extension: "rs",
+      mime: "text/x-rust",
+      from: false,
+      to: true,
+      internal: "rs",
+      category: "code",
+      lossless: true,
+    }, rust],
   ];
 
   public name: string = "textToSource";
