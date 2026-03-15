@@ -11,6 +11,14 @@ function javascript(text: string): string {
   return `console.log(${JSON.stringify(text)});`;
 }
 
+function c(text: string): string {
+  return `#include <stdio.h>\n\nint main() { printf("%s\n", ${JSON.stringify(text)}); }`;
+}
+
+function cpp(text: string): string {
+  return `#include <iostream>\n\nint main() { std::cout << ${JSON.stringify(text)} << std::endl; }`;
+}
+
 function go(text: string): string {
   text = text.replaceAll("`", "` + \"`\" + `");
   return `package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\`${text}\`)\n}\n`;
@@ -99,6 +107,28 @@ class textToSourceHandler implements FormatHandler {
       category: "code",
       lossless: true,
     }, javascript],
+    [{
+      name: "C Source File",
+      format: "c",
+      extension: "c",
+      mime: "text/x-c",
+      from: false,
+      to: true,
+      internal: "c",
+      category: "code",
+      lossless: true,
+    }, c],
+    [{
+      name: "C++ Source File",
+      format: "cpp",
+      extension: "cpp",
+      mime: "text/x-c++src",
+      from: false,
+      to: true,
+      internal: "cpp",
+      category: "code",
+      lossless: true,
+    }, cpp],
   ];
 
   public name: string = "textToSource";
