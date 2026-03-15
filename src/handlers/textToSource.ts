@@ -89,7 +89,7 @@ class textToSourceHandler implements FormatHandler {
       name: "Rust Source File",
       format: "rs",
       extension: "rs",
-      mime: "text/x-rust",
+      mime: "text/rust",
       from: false,
       to: true,
       internal: "rs",
