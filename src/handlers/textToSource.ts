@@ -12,7 +12,7 @@ function javascript(text: string): string {
 }
 
 function c(text: string): string {
-  return `#include <stdio.h>\n\nint main() { printf("%s\n", ${JSON.stringify(text)}); }`;
+  return `#include <stdio.h>\n\nint main() { printf("%s\\n", ${JSON.stringify(text)}); }`;
 }
 
 function cpp(text: string): string {
