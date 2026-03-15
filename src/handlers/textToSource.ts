@@ -12,7 +12,7 @@ function javascript(text: string): string {
 }
 
 function go(text: string): string {
-  text = text.replaceAll(/\r?\n/g, "\n").replaceAll("`", "` + \"`\" + `");
+  text = text.replaceAll("`", "` + \"`\" + `");
   return `package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\`${text}\`)\n}\n`;
 }
 
@@ -38,7 +38,7 @@ function csharp(text: string): string {
   // Content of the .txt file will be translated to a C# verbatim string,
   // so quotes must be escaped using the verbatim string escape syntax (two double quotes, "")
   // instead of the usual \" escape.
-  text = text.replaceAll(/\r?\n/g, "\n").replaceAll("\"", "\"\"");
+  text = text.replaceAll("\"", "\"\"");
   return `using System;\n\nConsole.WriteLine(@"${text}");\n\nConsole.Read();\n`;
 }
 
@@ -132,7 +132,7 @@ class textToSourceHandler implements FormatHandler {
     const [, converter] = converterEntry;
 
     for (const inputFile of inputFiles) {
-      const text = new TextDecoder().decode(inputFile.bytes);
+      const text = new TextDecoder().decode(inputFile.bytes).replaceAll(/\r?\n/g, "\n");
 
       const converted = converter(text);
 
