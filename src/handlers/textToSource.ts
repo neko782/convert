@@ -7,6 +7,10 @@ function python(text: string): string {
   return `print(${JSON.stringify(text)})`;
 }
 
+function javascript(text: string): string {
+  return `console.log(${JSON.stringify(text)});`;
+}
+
 function go(text: string): string {
   text = text.replaceAll(/\r?\n/g, "\n").replaceAll("`", "` + \"`\" + `");
   return `package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\`${text}\`)\n}\n`;
@@ -84,6 +88,17 @@ class textToSourceHandler implements FormatHandler {
       category: "code",
       lossless: true,
     }, rust],
+    [{
+      name: "Javascript Source File",
+      format: "js",
+      extension: "js",
+      mime: "text/javascript",
+      from: false,
+      to: true,
+      internal: "js",
+      category: "code",
+      lossless: true,
+    }, javascript],
   ];
 
   public name: string = "textToSource";
