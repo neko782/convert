@@ -15,7 +15,7 @@ class tarHandler implements FormatHandler {
   public name: string = "tar";
   public supportedFormats?: FileFormat[] = [
     CommonFormats.TAR.builder("tar").allowFrom().allowTo().markLossless(),
-    CommonFormats.ZIP.builder("zip").allowFrom().allowTo().markLossless()  
+    CommonFormats.ZIP.builder("zip").allowFrom().allowTo().markLossless(),
     {
       name: "Comic Book Archive (ZIP)",
       format: "cbz",
