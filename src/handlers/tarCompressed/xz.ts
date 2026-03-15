@@ -96,7 +96,7 @@ export function decompress(input: Uint8Array): Uint8Array {
 
   let outputLength = input.length * 3; // we cant really predict output length so we just guess
 
-  for (let i = 0; i < 50; i++) { // limit just in case but we will probably hit memory before that
+  while (outputLength < 1.9 * 1024 * 1024 * 1024) { 
     const inputBuf = e.malloc(input.length);
     const outputBuf = e.malloc(outputLength);
     const inPosBuf = e.malloc(4);
@@ -144,7 +144,7 @@ export function decompress(input: Uint8Array): Uint8Array {
       e.free(memlimitBuf);
     }
 
-    outputLength *= 2;
+    outputLength = Math.floor(outputLength * 1.5);
   }
 
   throw new Error("could not decompress xz in 50 iterations");
