@@ -67,6 +67,7 @@ import celariaMapHandler from "./celariaMap.ts";
 import cybergrindHandler from "./cybergrindHandler.ts";
 import textToSourceHandler from "./textToSource.ts";
 import chessjsHandler from "./chessjs.ts";
+import fenToJsonHandler from "./fenToJson.ts";
 
 const handlers: FormatHandler[] = [];
 try { handlers.push(new svgTraceHandler()) } catch (_) { };
@@ -142,5 +143,6 @@ try { handlers.push(new celariaMapHandler()) } catch (_) { };
 try { handlers.push(new cybergrindHandler()) } catch (_) { };
 try { handlers.push(new textToSourceHandler()) } catch (_) { };
 try { handlers.push(new chessjsHandler()) } catch (_) { };
+try { handlers.push(new fenToJsonHandler()) } catch (_) { };
 
 export default handlers;
