@@ -49,12 +49,13 @@ class shToElfHandler implements FormatHandler {
     const outputFiles: FileData[] = [];
 
     for (const inputFile of inputFiles) {
+      const binary = Buffer.from(new Uint8Array(this.#binary!));
+      replaceUint32LE(binary, 1273991571, inputFile.bytes.length);
+
       let file = Buffer.concat([
-        this.#binary!,
+        binary,
         inputFile.bytes
       ]);
-
-      replaceUint32LE(file, 1273991571, inputFile.bytes.length);
 
       outputFiles.push({ 
         name: inputFile.name.replace(/\.[^.]+$/, "") + ".elf",
