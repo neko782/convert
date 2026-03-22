@@ -58,7 +58,7 @@ class canvasToBlobHandler implements FormatHandler {
         this.#canvas.width = maxLineWidth;
         this.#canvas.height = Math.floor(fontSize * lines.length + footerPadding);
 
-        if (outputFormat.category === "image" || outputFormat.category?.includes("image")) {
+        if (outputFormat.mime === "image/jpeg") {
           this.#ctx.fillStyle = "white";
           this.#ctx.fillRect(0, 0, this.#canvas.width, this.#canvas.height);
         }
@@ -115,7 +115,7 @@ class canvasToBlobHandler implements FormatHandler {
         });
       }
 
-      const name = inputFile.name.split(".")[0] + "." + outputFormat.extension;
+      const name = inputFile.name.split(".").slice(0, -1).join(".") + "." + outputFormat.extension;
 
       outputFiles.push({ bytes, name });
 
