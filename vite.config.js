@@ -66,6 +66,14 @@ export default defineConfig({
           src: "src/handlers/tarCompressed/liblzma.wasm",
           dest: "wasm"
         },
+        {
+          src: "node_modules/turbowarp-packager-browser/dist/scaffolding/*",
+          dest: "js/turbowarp-scaffolding"
+        },
+        {
+          src: "node_modules/7z-wasm/7zz.wasm",
+          dest: "wasm"
+        }
       ]
     }),
     tsconfigPaths()
