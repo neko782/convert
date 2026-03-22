@@ -22,7 +22,7 @@ class turbowarpHandler implements FormatHandler {
       to: false,
       internal: "sb3",
       category: "archive",
-      lossless: true,
+      lossless: false,
     },
     CommonFormats.HTML.builder("html")
       .allowTo()
