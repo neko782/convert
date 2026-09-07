@@ -1,0 +1,2 @@
+# Patches must match the LF line endings in downloaded source archives.
+*.patch text eol=lf
