@@ -1,0 +1,68 @@
+diff --git a/build.sh b/build.sh
+index c8d2f8a62b648f9cff8a77b6e5600d1241f59a66..b242c24e4d60b8c2f136ac290a8e6ec6191e6710 100755
+--- a/build.sh
++++ b/build.sh
+@@ -1,15 +1,17 @@
+-#!/bin/sh -ex
++#!/bin/sh -e
+ 
+-export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
++export SOURCE_DATE_EPOCH=1772328338
+ 
+ WASI_VER=29
+ WASI_SDK=wasi-sdk-${WASI_VER}.0-x86_64-linux
+ WASI_SDK_URL=https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VER}/${WASI_SDK}.tar.gz
+-if ! [ -d ${WASI_SDK} ]; then curl -L ${WASI_SDK_URL} | tar xzf -; fi
+-WASI_SDK_PATH=$(pwd)/${WASI_SDK}
++if [ -z "${WASI_SDK_PATH:-}" ]; then
++  if ! [ -d ${WASI_SDK} ]; then curl -L ${WASI_SDK_URL} | tar xzf -; fi
++  WASI_SDK_PATH=$(pwd)/${WASI_SDK}
++fi
+ 
+ WASI_TARGET="wasm32-wasip1"
+ WASI_CFLAGS="--sysroot ${WASI_SDK_PATH}/share/wasi-sysroot -mcpu=lime1"
+ WASI_LDFLAGS="--sysroot ${WASI_SDK_PATH}/share/wasi-sysroot"
+-WASI_CFLAGS_LLVM="${WASI_CFLAGS}"
++WASI_CFLAGS_LLVM="${WASI_CFLAGS} -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/wasm32-wasip1/c++/v1 -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/c++/v1"
+ WASI_LDFLAGS_LLVM="${WASI_LDFLAGS}"
+@@ -65,7 +67,7 @@ LLVM_VERSION_MAJOR=$(cmake -P Get-LLVM-Version.cmake 2>&1)
+ if ! [ -f llvm-tblgen-build/bin/llvm-tblgen -a -f llvm-tblgen-build/bin/clang-tblgen ]; then
+   mkdir -p llvm-tblgen-build
+   cmake -B llvm-tblgen-build -S llvm-src/llvm \
+-    -DLLVM_CCACHE_BUILD=ON \
++    -DLLVM_CCACHE_BUILD=OFF \
+     -DCMAKE_BUILD_TYPE=MinSizeRel \
+     -DLLVM_BUILD_RUNTIME=OFF \
+     -DLLVM_BUILD_TOOLS=OFF \
+@@ -87,7 +89,12 @@ fi
+ mkdir -p llvm-build
+ cmake -B llvm-build -S llvm-src/llvm \
+   -DCMAKE_TOOLCHAIN_FILE=../Toolchain-WASI-LLVM.cmake \
+-  -DLLVM_CCACHE_BUILD=ON \
++  -DLLVM_FORCE_USE_OLD_TOOLCHAIN=ON \
++  -DLLVM_ENABLE_LIBCXX=ON \
++  -DHAVE_CXX_ATOMICS_WITHOUT_LIB=ON \
++  -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=ON \
++  -DLLVM_HAS_ATOMICS=ON \
++  -DLLVM_CCACHE_BUILD=OFF \
+   -DLLVM_NATIVE_TOOL_DIR=$(pwd)/llvm-tblgen-build/bin \
+   -DCMAKE_BUILD_TYPE=MinSizeRel \
+   -DLLVM_ENABLE_ASSERTIONS=ON \
+@@ -222,7 +229,7 @@ cmake --build llvm-build --target clang-resource-headers
+ # Install the headers also manually.
+ mkdir -p wasi-prefix/usr/
+ rm -rf wasi-prefix/usr/include
+-cp -v -r llvm-build/usr/include wasi-prefix/usr/
++cp -r llvm-build/usr/include wasi-prefix/usr/
+ 
+ # Options below heavily based on wasi-sdk.
+ mkdir -p compiler-rt-build
+@@ -243,7 +250,7 @@ cmake --build compiler-rt-build --target install
+ # moved to not check it by default too.
+ mkdir -p wasi-libc-build
+ make -C wasi-libc-src \
+-  CC="ccache ${WASI_SDK_PATH}/bin/clang" \
++  CC="${WASI_SDK_PATH}/bin/clang" \
+   AR=${WASI_SDK_PATH}/bin/ar \
+   NM=${WASI_SDK_PATH}/bin/nm \
+   TARGET_TRIPLE=${WASI_TARGET} \

@@ -2,12 +2,10 @@ import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 
 import CommonFormats, { Category } from "src/CommonFormats.ts";
 import { BadMagicError, EOFError, InitializationError } from "src/errors.ts";
-import libopenmptScriptUrl from "./libopenmpt/libopenmpt.js?url";
-import libopenmptWasmUrl from "./libopenmpt/libopenmpt.wasm?url";
+import createLibopenmpt from "third_party/generated/libopenmpt/libopenmpt.js";
+import libopenmptWasmUrl from "third_party/generated/libopenmpt/libopenmpt.wasm?url";
 
-interface LibOpenMPTModule {
-  __render(fileData: Uint8Array, sampleRate: number): Int16Array;
-}
+import type { LibOpenMPTModule } from "third_party/generated/libopenmpt/libopenmpt.js";
 
 const TRACKER_FORMATS: Array<{ ext: string; name: string; mime?: string }> = [
   { ext: "mptm", name: "OpenMPT Module" },
@@ -84,37 +82,16 @@ const SAMPLE_RATE = 48000;
 
 class libopenmptHandler implements FormatHandler {
   public name: string = "libopenmpt";
-  public readonly requiresMainThread = true;
   public supportedFormats: FileFormat[] = [];
   public ready: boolean = false;
 
   #module?: LibOpenMPTModule;
 
   async init(): Promise<void> {
-    // Pre-fetch the WASM binary so the Emscripten module can use it directly.
-    const wasmBinary = await fetch(libopenmptWasmUrl).then((r) =>
-      r.arrayBuffer(),
-    );
-
-    // Set the global that Emscripten picks up:
-    //   var Module = typeof libopenmpt != "undefined" ? libopenmpt : {}
-    // libopenmpt.js was patched to attach __readyPromise (resolves with Module)
-    // and __render (uses closure-scoped HEAPU8/HEAP16) before calling run().
-    (globalThis as any).libopenmpt = { wasmBinary };
-
-    // Load as a classic <script> tag so it is never run through Rollup/Vite's
-    // module pipeline (which would break the Emscripten global-variable pattern).
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = libopenmptScriptUrl;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load libopenmpt.js"));
-      document.head.appendChild(script);
+    this.#module = await createLibopenmpt({
+      locateFile: (path: string) =>
+        path.endsWith(".wasm") ? libopenmptWasmUrl : path,
     });
-
-    // __readyPromise was attached by our libopenmpt.js patch and resolves with
-    // the Module object once onRuntimeInitialized fires.
-    this.#module = await (globalThis as any).libopenmpt.__readyPromise;
 
     for (const fmt of TRACKER_FORMATS) {
       this.supportedFormats.push({
@@ -150,7 +127,7 @@ class libopenmptHandler implements FormatHandler {
 
     for (const inputFile of inputFiles) {
       const bytes = new Uint8Array(inputFile.bytes);
-      const pcmData = mod.__render(bytes, SAMPLE_RATE);
+      const pcmData = render(mod, bytes, SAMPLE_RATE);
       const wavBytes = buildWav(pcmData, SAMPLE_RATE, 2, 16);
       const name = inputFile.name.replace(/\.[^.]+$/, "") + ".wav";
       outputFiles.push({ bytes: wavBytes, name });
@@ -158,6 +135,64 @@ class libopenmptHandler implements FormatHandler {
 
     return outputFiles;
   }
+}
+
+/** Render a whole module to interleaved 16-bit stereo PCM (no looping). */
+function render(
+  mod: LibOpenMPTModule,
+  fileData: Uint8Array,
+  sampleRate: number,
+): Int16Array {
+  const FRAMES = 4096;
+
+  const inp = mod._malloc(fileData.length);
+  mod.HEAPU8.set(fileData, inp);
+  const m = mod._openmpt_module_create_from_memory2(
+    inp,
+    fileData.length,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+  );
+  mod._free(inp);
+  if (!m) throw new BadMagicError("libopenmpt: failed to open module");
+
+  mod._openmpt_module_set_repeat_count(m, 0);
+  const buf = mod._malloc(FRAMES * 2 * 2);
+  const chunks: Int16Array[] = [];
+  let total = 0;
+  try {
+    let n: number;
+    do {
+      n = mod._openmpt_module_read_interleaved_stereo(
+        m,
+        sampleRate,
+        FRAMES,
+        buf,
+      );
+      if (n > 0) {
+        // HEAP16 may be replaced when memory grows, so re-read it each time.
+        chunks.push(mod.HEAP16.slice(buf >> 1, (buf >> 1) + n * 2));
+        total += n;
+      }
+    } while (n > 0);
+  } finally {
+    mod._free(buf);
+    mod._openmpt_module_destroy(m);
+  }
+
+  if (total === 0) throw new EOFError("libopenmpt: module produced no audio");
+  const pcm = new Int16Array(total * 2);
+  let offset = 0;
+  for (const chunk of chunks) {
+    pcm.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return pcm;
 }
 
 function buildWav(

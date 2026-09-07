@@ -1,6 +1,7 @@
 node_modules
 dist
-bazel-*
+release
 .git
+.cache
 third_party/generated
 public/material-file-icons

@@ -1,5 +1,4 @@
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 import preact from "@preact/preset-vite";
 import { fileURLToPath } from "node:url";
 
@@ -32,15 +31,33 @@ function nodeModulesResolver() {
 
 export default defineConfig({
   publicDir: "public",
+  resolve: {
+    tsconfigPaths: true,
+    alias: {
+      "turbowarp-packager-browser": fileURLToPath(
+        new URL(
+          "./third_party/generated/turbowarp-packager-browser/dist/packager.browser.js",
+          import.meta.url,
+        ),
+      ),
+    },
+  },
   optimizeDeps: {
-    exclude: ["@ffmpeg/ffmpeg", "@sqlite.org/sqlite-wasm", "@yowasp/clang"],
+    include: ["turbowarp-packager-browser"],
+    exclude: ["@ffmpeg/ffmpeg", "@sqlite.org/sqlite-wasm"],
   },
   base: "./",
   worker: {
     format: "es",
-    plugins: () => [nodeModulesResolver(), tsconfigPaths()],
+    plugins: () => [nodeModulesResolver()],
   },
   build: {
+    commonjsOptions: {
+      include: [
+        /node_modules/,
+        /turbowarp-packager-browser\/dist\/packager\.browser\.js$/,
+      ],
+    },
     rollupOptions: {
       output: {
         assetFileNames(assetInfo) {
@@ -62,7 +79,6 @@ export default defineConfig({
   },
   plugins: [
     nodeModulesResolver(),
-    tsconfigPaths(),
     preact({
       prefreshEnabled: false,
       reactAliasesEnabled: true,

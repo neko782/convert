@@ -1,0 +1,20 @@
+--- a/mobi.js
++++ b/mobi.js
+@@ -844,7 +844,7 @@
+     }
+     async createDocument(section) {
+         const str = await this.loadText(section)
+-        return this.parser.parseFromString(str, this.#type)
++        return this.parser.parseFromString(str, MIME.HTML)
+     }
+     async loadSection(section) {
+         if (this.#cache.has(section)) return this.#cache.get(section)
+@@ -1167,7 +1167,7 @@
+     }
+     async createDocument(section) {
+         const str = await this.loadText(section)
+-        return this.parser.parseFromString(str, this.#type)
++        return this.parser.parseFromString(str, MIME.HTML)
+     }
+     async loadSection(section) {
+         if (this.#cache.has(section)) return this.#cache.get(section)

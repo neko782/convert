@@ -35,7 +35,7 @@ import {
   ConsoleStdout,
   PreopenDirectory,
 } from "@bjorn3/browser_wasi_shim";
-import pandocWasmUrl from "./pandoc.wasm?url";
+import pandocWasmUrl from "third_party/generated/pandoc/pandoc.wasm?url";
 
 const args = ["pandoc.wasm", "+RTS", "-H64m", "-RTS"];
 const env = [];

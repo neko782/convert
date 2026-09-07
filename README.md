@@ -44,12 +44,12 @@ Though please note, "converting X to Y doesn't work" is **not** a bug report. Ho
 
 ## Deployment
 
-### Local development (Bun + Bazel + Vite)
+### Local development (Bun + Vite)
 
 1. Clone this repository with `git clone https://github.com/neko782/convert-next`.
 2. Install [Bun](https://bun.sh/) (the version in `.bun-version`).
-3. Install [Bazelisk](https://github.com/bazelbuild/bazelisk). It reads `.bazelversion` and fetches the right Bazel automatically.
    - Alternatively, if you use Nix, `nix develop` provides everything.
+3. Run `bun install`.
 4. Run `bun run dev` to start the development server.
 
 ### Building the format cache
@@ -164,7 +164,10 @@ Not every handler needs a dedicated unit test, but handlers with non-trivial cus
 If your tool requires an external dependency (which it likely does), there are currently two well-established ways of going about this:
 
 - If it's an `npm` package, just install it to the project like you normally would.
-- If it's a Git repository or other project, add a pinned `http_archive` to [MODULE.bazel](MODULE.bazel) with a `third_party/<name>.BUILD.bazel` listing the files you need, plus a `vendor_tree` target in [third_party/BUILD.bazel](third_party/BUILD.bazel). Import the files as `third_party/generated/<name>/...`.
+- If it's a Git repository, release archive or data file, add an entry to [third_party/sources.js](third_party/sources.js): a pinned archive URL, its SHA-256, optional patches (in `third_party/patches/`) and optionally which files to copy. `bun run vendor` places it under `third_party/generated/<name>/`; import the files from there.
+- If it has to be compiled (C/C++ to WebAssembly, a bundler run, ...), declare its URL, checksum, `build` script and `artifacts: true` in `third_party/sources.js`, add the recipe under `third_party/recipes/<name>/`, and check in the archive it produces. Use `artifacts: false` for shell recipes that should run during vendoring. See [third_party/recipes/README.md](third_party/recipes/README.md).
+
+Do not commit prebuilt binaries into `src/`.
 
 **Please try to avoid CDNs (Content Delivery Networks).** They're really cool on paper, but they don't work well with TypeScript, and each one introduces a tiny bit of instability. For a project that leans heavily on external dependencies, those bits of instability can add up fast.
 

@@ -1,10 +1,10 @@
 import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 import CommonFormats, { Category } from "src/CommonFormats.ts";
-import SevenZip from "7z-wasm";
+import SevenZip from "third_party/generated/7z-wasm/7zz.es6.js";
 import mime from "mime";
 import normalizeMimeType from "src/normalizeMimeType.ts";
 import type { ConvertContext } from "src/ui/ProgressStore.js";
-import sevenZipWasmUrl from "node_modules/7z-wasm/7zz.wasm?url";
+import sevenZipWasmUrl from "third_party/generated/7z-wasm/7zz.wasm?url";
 
 const defaultSevenZipOptions = {
   locateFile: () => sevenZipWasmUrl,

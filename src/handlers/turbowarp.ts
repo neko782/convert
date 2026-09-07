@@ -5,9 +5,9 @@ import {
   largeAssets,
   downloadProject,
 } from "turbowarp-packager-browser";
-import addonsUrl from "node_modules/turbowarp-packager-browser/dist/scaffolding/addons.js?url";
-import scaffoldingFullUrl from "node_modules/turbowarp-packager-browser/dist/scaffolding/scaffolding-full.js?url";
-import scaffoldingMinUrl from "node_modules/turbowarp-packager-browser/dist/scaffolding/scaffolding-min.js?url";
+import addonsUrl from "third_party/generated/turbowarp-packager-browser/dist/scaffolding/addons.js?url";
+import scaffoldingFullUrl from "third_party/generated/turbowarp-packager-browser/dist/scaffolding/scaffolding-full.js?url";
+import scaffoldingMinUrl from "third_party/generated/turbowarp-packager-browser/dist/scaffolding/scaffolding-min.js?url";
 import JSZip from "@turbowarp/jszip";
 import createUnpackager from "third_party/generated/turbowarp-unpackager/unpackager.js";
 

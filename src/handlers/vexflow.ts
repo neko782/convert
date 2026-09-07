@@ -410,48 +410,50 @@ class VexFlowHandler implements FormatHandler {
         }
         VexFlow.setFonts("Bravura", "Academico");
 
-        // Configure vexml with proper width for multi-line rendering
-        const config = {
-          ...vexml.DEFAULT_CONFIG,
-          WIDTH: 800, // Page width - controls line wrapping
-          VIEWPORT_SCALE: 1.0,
-          DRAWING_BACKEND: "canvas" as const, // Use canvas to avoid font loading issues
-        };
-
         // Create a temporary div element for vexml to render into
         const div = document.createElement("div");
         div.style.width = "800px";
         div.style.backgroundColor = "white";
         div.style.padding = "20px";
 
-        // Render using vexml - we already have xmlString from above
-        const score = vexml.renderMusicXML(xmlString, div, { config });
-
-        // Wait a bit for rendering to complete
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        // Extract the rendered content (canvas elements with music notation)
-        const canvases = div.querySelectorAll("canvas");
-        if (canvases.length === 0) {
-          throw new Error("Failed to render MusicXML - no canvases generated");
-        }
-
-        // Convert canvases to base64 images for embedding in HTML
-        const imageDataPromises = Array.from(canvases).map((canvas) => {
-          return new Promise<string>((resolve) => {
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              } else {
-                resolve(canvas.toDataURL("image/png"));
-              }
-            }, "image/png");
-          });
+        const score = await vexml.render(xmlString, div, {
+          width: 800,
+          layout: { type: "standard", referenceWidth: 800 },
+          fonts: {
+            notation: { family: "Bravura" },
+            text: { family: "Academico" },
+          },
         });
 
-        const imageDataUrls = await Promise.all(imageDataPromises);
+        let imageDataUrls: string[];
+        try {
+          // Extract the rendered content (canvas elements with music notation)
+          const canvases = div.querySelectorAll("canvas");
+          if (canvases.length === 0) {
+            throw new Error(
+              "Failed to render MusicXML - no canvases generated",
+            );
+          }
+
+          // Convert canvases to base64 images for embedding in HTML
+          const imageDataPromises = Array.from(canvases).map((canvas) => {
+            return new Promise<string>((resolve) => {
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.readAsDataURL(blob);
+                } else {
+                  resolve(canvas.toDataURL("image/png"));
+                }
+              }, "image/png");
+            });
+          });
+
+          imageDataUrls = await Promise.all(imageDataPromises);
+        } finally {
+          score.dispose();
+        }
 
         // Create HTML with embedded images
         const imagesHtml = imageDataUrls

@@ -8,8 +8,8 @@ import mime from "mime";
 import normalizeMimeType from "../normalizeMimeType.ts";
 import CommonFormats, { Category } from "src/CommonFormats.ts";
 import { BadMagicError, EOFError, InitializationError } from "src/errors.ts";
-import ffmpegCoreUrl from "node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js?url";
-import ffmpegWasmUrl from "node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm?url";
+import ffmpegCoreUrl from "third_party/generated/ffmpeg-core/dist/esm/ffmpeg-core.js?url";
+import ffmpegWasmUrl from "third_party/generated/ffmpeg-core/dist/esm/ffmpeg-core.wasm?url";
 
 export function getSpecialAudioFormats(): FileFormat[] {
   return [

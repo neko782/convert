@@ -7,5 +7,4 @@ dist
 release
 cache.json
 result
-bazel-*
 third_party/generated

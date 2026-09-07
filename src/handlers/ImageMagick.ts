@@ -12,7 +12,7 @@ import normalizeMimeType from "../normalizeMimeType.ts";
 import CommonFormats from "src/CommonFormats.ts";
 import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 import type { ConvertContext } from "../ui/ProgressStore.js";
-import magickWasmUrl from "node_modules/@imagemagick/magick-wasm/dist/magick.wasm?url";
+import magickWasmUrl from "@imagemagick/magick-wasm/magick.wasm?url";
 
 class ImageMagickHandler implements FormatHandler {
   public name: string = "ImageMagick";

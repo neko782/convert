@@ -16,7 +16,7 @@ import CommonFormats, { Category } from "src/CommonFormats.ts";
 import { BadMagicError, EOFError, InitializationError } from "src/errors.ts";
 import fluidSynthScriptUrl from "node_modules/js-synthesizer/externals/libfluidsynth-2.4.6.js?url";
 import jsSynthesizerScriptUrl from "node_modules/js-synthesizer/dist/js-synthesizer.js?url";
-import soundfontUrl from "./midi/TimGM6mb.sf2?url";
+import soundfontUrl from "third_party/generated/timgm6mb-soundfont/TimGM6mb.sf2?url";
 
 const SAMPLE_RATE = 44100;
 const BUFFER_FRAMES = 4096;
@@ -46,9 +46,10 @@ let midiInitPromise: Promise<{ JSSynth: any; sfontBin: ArrayBuffer }> | null =
 function loadFluidSynth(): Promise<{ JSSynth: any; sfontBin: ArrayBuffer }> {
   if (!midiInitPromise) {
     midiInitPromise = (async () => {
-      // libfluidsynth-2.4.6.js and libopenmpt.js both declare "class ExceptionInfo"
-      // at the top level of a classic <script>. Top-level class declarations behave
-      // like let so redeclaring one in the same global scope throws a SyntaxError.
+      // libfluidsynth-2.4.6.js declares "class ExceptionInfo" at the top level of a
+      // classic <script>, as does every other non-modularized Emscripten build.
+      // Top-level class declarations behave like let so a second such script in
+      // the same global scope throws a SyntaxError.
       // Fix: fetch libfluidsynth content and import it via a Blob URL as an ES module.
       // Module-scoped class declarations dont pollute the global scope.
       //

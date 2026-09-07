@@ -1,8 +1,8 @@
 import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 import CommonFormats from "src/CommonFormats.ts";
 import JSZip from "jszip";
-import pako from "pako";
-import { isMOBI, MOBI } from "./azw3/mobi.js";
+import * as pako from "pako";
+import { isMOBI, MOBI } from "third_party/generated/foliate-js/mobi.js";
 
 class azw3Handler implements FormatHandler {
   public name: string = "azw3";

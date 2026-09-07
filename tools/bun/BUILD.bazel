@@ -1,4 +1,0 @@
-exports_files([
-    "dev.sh",
-    "export.sh",
-])

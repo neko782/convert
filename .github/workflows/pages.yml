@@ -18,35 +18,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # bun_install skips puppeteer's browser download (--ignore-scripts); use
-    # the Chrome preinstalled on the runner instead. Job-level on purpose:
-    # .bazelrc has --action_env for this, so a value that differs between the
-    # build and cache steps would invalidate every action and rebuild the site.
+    # bun install runs with lifecycle scripts disabled, so puppeteer never
+    # downloads a browser; use the Chrome preinstalled on the runner.
     env:
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-          # @npm is produced by `bun install` inside a repository rule; the
-          # repository cache only holds downloads, so cache the result itself.
-          # bun_install also watches the bun binary, hence the pinned version.
-          external-cache: |
-            manifest:
-              npm:
-                - bun.lock
-                - package.json
-                - .npmrc
-                - .bun-version
-          # PRs read the master cache but must not overwrite it.
-          cache-save: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v7
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -54,15 +33,20 @@ jobs:
           bun-version-file: .bun-version
           cache: true
 
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Cache vendored archives
+        uses: actions/cache@v5
+        with:
+          path: .cache/vendor
+          key: vendor-${{ hashFiles('third_party/sources.js') }}
+
       - name: Build
         run: bun run build
 
       - name: Generate cache
         run: bun run cache:build
-
-      # tests run against the checkout, so they need a local node_modules
-      - name: Install dependencies
-        run: bun i --frozen-lockfile
 
       - name: Test traversion graph
         run: bun test test/TraversionGraph.test.ts
@@ -72,7 +56,7 @@ jobs:
 
       - name: Upload Pages artifact
         if: github.event_name == 'push'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -87,4 +71,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

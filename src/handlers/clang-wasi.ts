@@ -1,6 +1,6 @@
 import type { FileData, FileFormat, FormatHandler } from "../FormatHandler.ts";
 import CommonFormats, { Category } from "src/CommonFormats.ts";
-import { commands } from "@yowasp/clang";
+import { commands } from "third_party/generated/yowasp-clang/gen/bundle.js";
 
 class clangWasiHandler implements FormatHandler {
   public name: string = "clang-wasi";

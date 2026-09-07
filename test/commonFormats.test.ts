@@ -1,62 +1,13 @@
-import { afterAll, expect, test } from "bun:test";
-import puppeteer from "puppeteer";
+import { expect, test } from "bun:test";
 import type {
   FileData,
   FormatHandler,
   FileFormat,
-  ConvertPathNode,
 } from "../src/FormatHandler.js";
 import CommonFormats from "../src/CommonFormats.js";
+import { useBrowser } from "./browser.js";
 
-declare global {
-  interface Window {
-    queryFormatNode: (
-      testFunction: (value: ConvertPathNode) => boolean,
-    ) => ConvertPathNode | undefined;
-    tryConvertByTraversing: (
-      files: FileData[],
-      from: ConvertPathNode,
-      to: ConvertPathNode,
-    ) => Promise<{
-      files: FileData[];
-      path: ConvertPathNode[];
-    } | null>;
-  }
-}
-
-// Set up a basic webserver to host the distribution build
-const server = Bun.serve({
-  async fetch(req) {
-    let path =
-      new URL(req.url).pathname.replace("/convert/", "") || "index.html";
-    path = path.replaceAll("..", "");
-    if (path.startsWith("/test/")) path = "../test/resources/" + path.slice(6);
-    const file = Bun.file(`${__dirname}/../dist/${path}`);
-    if (!(await file.exists()))
-      return new Response("Not Found", { status: 404 });
-    return new Response(file);
-  },
-  port: 8080,
-});
-
-// Start puppeteer, wait for ready confirmation
-const browser = await puppeteer.launch({
-  headless: true,
-  args: ["--no-sandbox", "--disable-setuid-sandbox"],
-});
-const page = await browser.newPage();
-
-await Promise.all([
-  new Promise((resolve) => {
-    page.on("console", (msg) => {
-      const text = msg.text();
-      if (text === "Built initial format list.") resolve(null);
-    });
-  }),
-  page.goto("http://localhost:8080/convert/index.html"),
-]);
-
-console.log("Setup finished.");
+const browser = useBrowser();
 
 const dummyHandler: FormatHandler = {
   name: "dummy",
@@ -68,7 +19,7 @@ const dummyHandler: FormatHandler = {
 };
 
 function attemptConversion(files: string[], from: FileFormat, to: FileFormat) {
-  return page.evaluate(
+  return browser.page.evaluate(
     async (testFileNames, from, to) => {
       const files: FileData[] = [];
       for (const fileName of testFileNames) {
@@ -197,6 +148,10 @@ test(
       "image/png",
       "image/gif",
     ]);
+    expect(conversion!.files.length).toBe(1);
+    expect(Object.values(conversion!.files[0].bytes).slice(0, 3)).toEqual([
+      0x47, 0x49, 0x46,
+    ]);
   },
   { timeout: 60000 },
 );
@@ -261,12 +216,3 @@ test(
   },
   { timeout: 60000 },
 );
-
-// ==================================================================
-//                          END OF TESTS
-// ==================================================================
-
-afterAll(async () => {
-  await browser.close();
-  server.stop();
-});
