@@ -27,7 +27,15 @@ diff --git a/build.sh b/build.sh
  WASI_LDFLAGS_LLVM="${WASI_LDFLAGS}"
  # LLVM has some (unreachable in our configuration) calls to mmap.
  WASI_CFLAGS_LLVM="${WASI_CFLAGS_LLVM} -D_WASI_EMULATED_MMAN"
-@@ -65,7 +67,7 @@
+@@ -27,6 +29,7 @@
+ WASI_LDFLAGS_LLVM="${WASI_LDFLAGS_LLVM} -flto -Wl,--strip-all"
+
+ cat >Toolchain-WASI.cmake <<END
++list(APPEND CMAKE_MODULE_PATH "${WASI_SDK_PATH}/share/cmake")
+ set(CMAKE_SYSTEM_NAME WASI)
+ set(CMAKE_SYSTEM_VERSION 1)
+ set(CMAKE_SYSTEM_PROCESSOR wasm32)
+@@ -65,7 +68,7 @@
  if ! [ -f llvm-tblgen-build/bin/llvm-tblgen -a -f llvm-tblgen-build/bin/clang-tblgen ]; then
    mkdir -p llvm-tblgen-build
    cmake -B llvm-tblgen-build -S llvm-src/llvm \
@@ -36,7 +44,7 @@ diff --git a/build.sh b/build.sh
      -DCMAKE_BUILD_TYPE=MinSizeRel \
      -DLLVM_BUILD_RUNTIME=OFF \
      -DLLVM_BUILD_TOOLS=OFF \
-@@ -87,7 +89,12 @@
+@@ -87,7 +90,12 @@
  mkdir -p llvm-build
  cmake -B llvm-build -S llvm-src/llvm \
    -DCMAKE_TOOLCHAIN_FILE=../Toolchain-WASI-LLVM.cmake \
@@ -50,7 +58,7 @@ diff --git a/build.sh b/build.sh
    -DLLVM_NATIVE_TOOL_DIR=$(pwd)/llvm-tblgen-build/bin \
    -DCMAKE_BUILD_TYPE=MinSizeRel \
    -DLLVM_ENABLE_ASSERTIONS=ON \
-@@ -223,7 +230,7 @@
+@@ -223,7 +231,7 @@
  # Install the headers also manually.
  mkdir -p wasi-prefix/usr/
  rm -rf wasi-prefix/usr/include
@@ -59,7 +67,7 @@ diff --git a/build.sh b/build.sh
 
  # Options below heavily based on wasi-sdk.
  mkdir -p compiler-rt-build
-@@ -243,7 +250,7 @@
+@@ -243,7 +251,7 @@
  # moved to not check it by default too.
  mkdir -p wasi-libc-build
  make -C wasi-libc-src \
@@ -68,7 +76,7 @@ diff --git a/build.sh b/build.sh
    AR=${WASI_SDK_PATH}/bin/ar \
    NM=${WASI_SDK_PATH}/bin/nm \
    TARGET_TRIPLE=${WASI_TARGET} \
-@@ -252,14 +259,20 @@
+@@ -252,14 +260,20 @@
    OBJDIR=$(pwd)/wasi-libc-build
 
  # Options below heavily based on wasi-sdk.
@@ -91,7 +99,7 @@ diff --git a/build.sh b/build.sh
    -DLIBCXX_ENABLE_FILESYSTEM:BOOL=ON \
    -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL=OFF \
    -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF \
-@@ -271,8 +284,11 @@
+@@ -271,8 +285,11 @@
    -DLIBCXXABI_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL=ON \
    -DLIBCXXABI_ENABLE_PIC:BOOL=OFF \
    -DLIBCXXABI_ENABLE_SHARED:BOOL=OFF \

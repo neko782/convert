@@ -5,7 +5,8 @@
 #
 # build.patch adapts upstream's build.sh to a tarball checkout: fixed
 # SOURCE_DATE_EPOCH, WASI SDK from $WASI_SDK_PATH, no ccache, libc++ include
-# paths for the WASI target.
+# paths for the WASI target. llvm-wasi.patch carries YoWASP's platform
+# compatibility changes forward to the official LLVM 23.1.0 release.
 #
 # Provenance of the checked-in artifacts.tar.gz: it is not yet an output of this
 # recipe but the published npm package @yowasp/clang@22.0.0-git20542-10
@@ -15,11 +16,11 @@
 set -eu
 . /recipes/lib.sh
 
-CLANG_VERSION=22.0.0-git20542-10
+CLANG_VERSION=23.1.0
 
 fetch_extract "$SOURCE_URL" "$SOURCE_SHA256" clang
-fetch_extract https://github.com/YoWASP/llvm-project/archive/97196c8eeb1d495fa43bb8af2fb26af5ef5b89fb.tar.gz \
-  f0bc914770aa38773b80dc1e707cb3dd6c015aca1255ac7141f42df6a8818792 clang/llvm-src
+fetch_extract https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz \
+  ab1f0e3ec52448c33e8782eaf0422504b87c7b016b22514653ee0d8fcee479ff clang/llvm-src
 fetch_extract https://github.com/WebAssembly/wasi-libc/archive/ac020b86fd44bafe60aa4fa12f407d16e3731329.tar.gz \
   d44bd7fa456aa42c1494767e5ffa00cdbab182d8497a577592a6562629f6f49e clang/wasi-libc-src
 fetch_extract https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz \
@@ -27,6 +28,7 @@ fetch_extract https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk
 
 cd clang
 patch -p1 < "$RECIPE/build.patch"
+patch --fuzz=0 -d llvm-src -p1 < "$RECIPE/llvm-wasi.patch"
 WASI_SDK_PATH="$PWD/../wasi-sdk" CMAKE_BUILD_PARALLEL_LEVEL="$JOBS" ./build.sh
 
 # Upstream's package-npmjs.sh, with the version pinned instead of derived from
