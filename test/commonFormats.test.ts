@@ -1,26 +1,32 @@
 import { expect, test } from "bun:test";
-import type {
-  FileData,
-  FormatHandler,
-  FileFormat,
-} from "../src/FormatHandler.js";
+import type { FileData, IFormatDefinition } from "../src/FormatHandler.js";
 import CommonFormats from "../src/CommonFormats.js";
 import { useBrowser } from "./browser.js";
 
 const browser = useBrowser();
 
-const dummyHandler: FormatHandler = {
-  name: "dummy",
-  ready: true,
-  async init() {},
-  async doConvert(inputFiles, inputFormat, outputFormat, args) {
-    return [];
-  },
-};
-
-function attemptConversion(files: string[], from: FileFormat, to: FileFormat) {
+function attemptConversion(
+  files: string[],
+  from: IFormatDefinition,
+  to: IFormatDefinition,
+) {
   return browser.page.evaluate(
     async (testFileNames, from, to) => {
+      const input = window.queryFormatNode(
+        ({ format }) =>
+          format.from &&
+          format.mime === from.mime &&
+          format.format === from.format,
+      );
+      const output = window.queryFormatNode(
+        ({ format }) =>
+          format.to && format.mime === to.mime && format.format === to.format,
+      );
+      if (!input || !output) {
+        throw new Error(
+          `Unsupported conversion: ${from.format} to ${to.format}`,
+        );
+      }
       const files: FileData[] = [];
       for (const fileName of testFileNames) {
         files.push({
@@ -28,11 +34,11 @@ function attemptConversion(files: string[], from: FileFormat, to: FileFormat) {
           name: fileName,
         });
       }
-      return await window.tryConvertByTraversing(files, from, to);
+      return await window.tryConvertByTraversing(files, input, output);
     },
     files,
-    { format: from, handler: dummyHandler },
-    { format: to, handler: dummyHandler },
+    from,
+    to,
   );
 }
 
