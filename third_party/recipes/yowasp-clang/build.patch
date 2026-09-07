@@ -23,7 +23,7 @@ diff --git a/build.sh b/build.sh
  WASI_CFLAGS="--sysroot ${WASI_SDK_PATH}/share/wasi-sysroot -mcpu=lime1"
  WASI_LDFLAGS="--sysroot ${WASI_SDK_PATH}/share/wasi-sysroot"
 -WASI_CFLAGS_LLVM="${WASI_CFLAGS}"
-+WASI_CFLAGS_LLVM="${WASI_CFLAGS} -mtail-call -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/wasm32-wasip1/c++/v1 -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/c++/v1"
++WASI_CFLAGS_LLVM="${WASI_CFLAGS} -mtail-call -fno-optimize-sibling-calls -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/wasm32-wasip1/c++/v1 -isystem ${WASI_SDK_PATH}/share/wasi-sysroot/include/c++/v1"
 -WASI_LDFLAGS_LLVM="${WASI_LDFLAGS}"
 +WASI_LDFLAGS_LLVM="${WASI_LDFLAGS} -mtail-call"
  # LLVM has some (unreachable in our configuration) calls to mmap.

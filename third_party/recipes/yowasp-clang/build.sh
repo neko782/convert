@@ -3,16 +3,6 @@
 # browser the same way as the @yowasp/clang npm package (gen/bundle.js plus the
 # wasm and resource files it loads). This is a full LLVM build: several hours.
 #
-# build.patch adapts upstream's build.sh to a tarball checkout: fixed
-# SOURCE_DATE_EPOCH, WASI SDK from $WASI_SDK_PATH, libc++ include
-# paths for the WASI target, and tail calls for Clang's interpreter (including
-# LTO linking). llvm-wasi.patch carries YoWASP's platform
-# compatibility changes forward to the official LLVM 23.1.0 release.
-# LLVM compilation uses the persistent ccache volume provided by prebuilt.js;
-# sources and CMake configuration stay fresh on every run. LTO is enabled by
-# default to eliminate unused host API imports. Set CONVERT_LLVM_LTO=0 for
-# faster iteration. LTO linking is uncached.
-#
 # The checked-in artifacts.tar.gz is built by this recipe with LTO disabled.
 set -eu
 . /recipes/lib.sh
