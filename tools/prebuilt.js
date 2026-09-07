@@ -13,7 +13,7 @@
 // recipe directory is mounted, read-only; downloaded sources are cached in a
 // Docker volume; the archive comes back on stdout (see run.sh).
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -50,19 +50,39 @@ for (const name of names) {
 
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
-function docker(args, stdout = "inherit") {
-  const result = spawnSync("docker", args, {
-    stdio: ["ignore", stdout, "inherit"],
+const container = `convert-prebuilt-${randomUUID()}`;
+
+async function docker(args, stdout = "inherit") {
+  const child = Bun.spawn(["docker", ...args], {
+    stdin: "ignore",
+    stdout,
+    stderr: "inherit",
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0)
-    throw new Error(`docker ${args[0]} failed (exit ${result.status})`);
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+    child.kill("SIGKILL");
+  };
+  process.on("SIGINT", cancel);
+  process.on("SIGTERM", cancel);
+  try {
+    const status = await child.exited;
+    if (cancelled || status !== 0)
+      throw new Error(
+        `docker ${args[0]} failed (${cancelled ? "cancelled" : `exit ${status}`})`,
+      );
+  } finally {
+    if (args[0] === "run")
+      spawnSync("docker", ["rm", "-f", container], { stdio: "ignore" });
+    process.off("SIGINT", cancel);
+    process.off("SIGTERM", cancel);
+  }
 }
 
 let image = process.env.CONVERT_TOOLCHAIN_IMAGE;
 if (!image) {
   image = "convert-toolchain";
-  docker([
+  await docker([
     "build",
     "--platform",
     platform,
@@ -80,6 +100,7 @@ for (const name of names) {
   const fresh = archive + ".new";
   console.log(`prebuilt: building ${name}`);
   const options = [
+    ["--init", "--name", container],
     ["--platform", platform],
     network,
     ["--volume", `${recipesDir}:/recipes:ro`],
@@ -94,7 +115,10 @@ for (const name of names) {
   ].flat();
   const fd = openSync(fresh, "w");
   try {
-    docker(["run", "--rm", ...options, image, "sh", "/recipes/run.sh"], fd);
+    await docker(
+      ["run", "--rm", ...options, image, "sh", "/recipes/run.sh"],
+      fd,
+    );
   } catch (error) {
     closeSync(fd);
     unlinkSync(fresh);

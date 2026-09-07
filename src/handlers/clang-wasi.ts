@@ -66,8 +66,13 @@ class clangWasiHandler implements FormatHandler {
       const output = await commands[
         inputFormat.internal === "cpp" ? "clang++" : "clang"
       ](
-        [inputFile.name, "-o", "out.wasm", "-O3", "-fno-exceptions"],
-        // this build specifically excludes exceptions for some reason
+        [
+          inputFile.name,
+          "-o",
+          "out.wasm",
+          "-O3",
+          ...(inputFormat.internal === "cpp" ? ["-fwasm-exceptions"] : []),
+        ],
         {
           [inputFile.name]: inputFile.bytes,
         },
