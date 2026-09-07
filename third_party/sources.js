@@ -123,6 +123,12 @@ export default [
     artifacts: true,
   },
   {
+    name: "batToExe",
+    url: null,
+    build: "batToExe/build.sh",
+    artifacts: true,
+  },
+  {
     name: "shToElf",
     url: null,
     build: "shToElf/build.sh",
