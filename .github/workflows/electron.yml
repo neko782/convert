@@ -59,7 +59,7 @@ jobs:
           tag_name: latest
           name: Rolling Release
           prerelease: true
-          overwrite: true
+          overwrite_files: true
           files: |
             release/*.exe
             release/*.dmg

@@ -217,7 +217,22 @@ export interface FormatHandler {
   ) => Promise<FileData[]>;
 }
 
-export class ConvertPathNode {
+/**
+ * The subset of a {@link FormatHandler} needed to build and search the
+ * traversion graph. It is fully serializable, so it can be sent to a worker.
+ */
+export type GraphHandler = Pick<
+  FormatHandler,
+  "name" | "supportedFormats" | "supportAnyInput"
+>;
+
+/** A node in a traversion graph path. Every {@link ConvertPathNode} is one. */
+export interface GraphNode {
+  handler: GraphHandler;
+  format: FileFormat;
+}
+
+export class ConvertPathNode implements GraphNode {
   public handler: FormatHandler;
   public format: FileFormat;
   constructor(handler: FormatHandler, format: FileFormat) {

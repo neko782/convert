@@ -244,8 +244,12 @@ window.tryConvertByTraversing = async function (
     signal,
   )) {
     if (signal?.aborted) return null;
-    if (path.at(-1)?.handler === to.handler) {
-      path[path.length - 1] = to;
+    // Use exact output format if the target handler supports it. Keep the
+    // handler resolved by the graph client, since `to.handler` is only
+    // guaranteed to match by name.
+    const last = path.at(-1);
+    if (last && last.handler.name === to.handler.name) {
+      path[path.length - 1] = { handler: last.handler, format: to.format };
     }
     const attempt = await attemptConvertPath(files, path, signal);
     if (attempt) return attempt;

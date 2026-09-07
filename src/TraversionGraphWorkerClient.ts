@@ -3,12 +3,9 @@ import {
   type ConvertPathNode,
   type FileFormat,
   type FormatHandler,
+  type GraphHandler,
 } from "./FormatHandler.js";
 
-export type GraphHandler = Pick<
-  FormatHandler,
-  "name" | "supportedFormats" | "supportAnyInput"
->;
 /** A path node that can be sent across the worker boundary. */
 export type GraphPathNode = { handler: string; format: FileFormat };
 export type GraphRequest =

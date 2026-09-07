@@ -1,14 +1,10 @@
-import {
-  ConvertPathNode,
-  type FileFormat,
-  type FormatHandler,
-} from "./FormatHandler.ts";
+import type { FileFormat, GraphHandler, GraphNode } from "./FormatHandler.ts";
 import { PriorityQueue } from "./PriorityQueue.ts";
 
 interface QueueNode {
   index: number;
   cost: number;
-  path: ConvertPathNode[];
+  path: GraphNode[];
   visitedBorder: number;
 }
 interface CategoryChangeCost {
@@ -47,7 +43,7 @@ export interface Edge {
 }
 
 export class TraversionGraph {
-  private handlers: FormatHandler[] = [];
+  private handlers: GraphHandler[] = [];
   private nodes: Node[] = [];
   private edges: Edge[] = [];
   private categoryChangeCosts: CategoryChangeCost[] = [
@@ -73,7 +69,7 @@ export class TraversionGraph {
     { categories: ["audio", "video", "image"], cost: 10000 }, // Converting from audio to image through video is especially lossy
   ];
   // Keeps track of path segments that have failed when attempted during the last run
-  private temporaryDeadEnds: ConvertPathNode[][] = [];
+  private temporaryDeadEnds: GraphNode[][] = [];
 
   public addCategoryChangeCost(
     from: string,
@@ -176,7 +172,7 @@ export class TraversionGraph {
     );
   }
 
-  public addDeadEndPath(pathFragment: ConvertPathNode[]) {
+  public addDeadEndPath(pathFragment: GraphNode[]) {
     this.temporaryDeadEnds.push(pathFragment);
   }
   public clearDeadEndPaths() {
@@ -189,7 +185,7 @@ export class TraversionGraph {
    */
   public init(
     supportedFormatCache: Map<string, FileFormat[]>,
-    handlers: FormatHandler[],
+    handlers: GraphHandler[],
     strictCategories: boolean = false,
   ) {
     this.handlers = handlers;
@@ -416,23 +412,22 @@ export class TraversionGraph {
     console.log(output);
   }
 
-  private listeners: Array<(state: string, path: ConvertPathNode[]) => void> =
-    [];
+  private listeners: Array<(state: string, path: GraphNode[]) => void> = [];
   public addPathEventListener(
-    listener: (state: string, path: ConvertPathNode[]) => void,
+    listener: (state: string, path: GraphNode[]) => void,
   ) {
     this.listeners.push(listener);
   }
 
-  private dispatchEvent(state: string, path: ConvertPathNode[]) {
+  private dispatchEvent(state: string, path: GraphNode[]) {
     this.listeners.forEach((l) => l(state, path));
   }
 
   public async *searchPath(
-    from: ConvertPathNode,
-    to: ConvertPathNode,
+    from: GraphNode,
+    to: GraphNode,
     simpleMode: boolean,
-  ): AsyncGenerator<ConvertPathNode[]> {
+  ): AsyncGenerator<GraphNode[]> {
     // Dijkstra's algorithm
     // Priority queue of {index, cost, path}
     let queue: PriorityQueue<QueueNode> = new PriorityQueue<QueueNode>(
@@ -520,7 +515,7 @@ export class TraversionGraph {
     );
   }
 
-  private calculateAdaptiveCost(path: ConvertPathNode[]): number {
+  private calculateAdaptiveCost(path: GraphNode[]): number {
     for (const deadEnd of this.temporaryDeadEnds) {
       let isDeadEnd = true;
       for (let i = 0; i < deadEnd.length; i++) {

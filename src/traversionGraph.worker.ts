@@ -1,5 +1,5 @@
 import { TraversionGraph } from "./TraversionGraph.js";
-import type { ConvertPathNode, FormatHandler } from "./FormatHandler.js";
+import type { GraphHandler, GraphNode } from "./FormatHandler.js";
 import type {
   GraphPathNode,
   GraphRequest,
@@ -7,16 +7,16 @@ import type {
 } from "./TraversionGraphWorkerClient.js";
 
 const graph = new TraversionGraph();
-let handlers: FormatHandler[] = [];
-let paths: AsyncGenerator<ConvertPathNode[]> | undefined;
+let handlers: GraphHandler[] = [];
+let paths: AsyncGenerator<GraphNode[]> | undefined;
 
-function toNode(node: GraphPathNode): ConvertPathNode {
+function toNode(node: GraphPathNode): GraphNode {
   const handler = handlers.find((handler) => handler.name === node.handler);
   if (!handler) throw new Error(`Unknown graph handler: ${node.handler}`);
   return { handler, format: node.format };
 }
 
-function fromNode(node: ConvertPathNode): GraphPathNode {
+function fromNode(node: GraphNode): GraphPathNode {
   return { handler: node.handler.name, format: node.format };
 }
 
@@ -32,14 +32,7 @@ async function handle(
 ): Promise<GraphPathNode[] | undefined> {
   switch (request.type) {
     case "init":
-      handlers = request.handlers.map((handler) => ({
-        ...handler,
-        ready: false,
-        init: async () => {},
-        doConvert: async () => {
-          throw new Error("Graph worker cannot convert files");
-        },
-      }));
+      handlers = request.handlers;
       graph.init(request.formats, handlers, request.strictCategories);
       return;
     case "search":

@@ -34,6 +34,7 @@
   },
   "build": {
     "appId": "com.p2r3.convert",
+    "artifactName": "convert-${version}-${arch}.${ext}",
     "executableName": "ConvertToIt",
     "npmRebuild": false,
     "directories": {
