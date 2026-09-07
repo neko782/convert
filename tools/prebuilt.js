@@ -10,8 +10,9 @@
 //
 // Recipes run in the toolchain image built from third_party/recipes/Dockerfile
 // (set CONVERT_TOOLCHAIN_IMAGE to use an already built image instead). Only the
-// recipe directory is mounted, read-only; downloaded sources are cached in a
-// Docker volume; the archive comes back on stdout (see run.sh).
+// recipe directory is mounted, read-only; downloads and compiler results are
+// cached in Docker volumes; the archive comes back on stdout (see run.sh).
+// Clear compiler results with: docker volume rm convert-prebuilt-ccache
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -105,6 +106,11 @@ for (const name of names) {
     network,
     ["--volume", `${recipesDir}:/recipes:ro`],
     ["--volume", "convert-prebuilt-downloads:/downloads"],
+    ["--volume", "convert-prebuilt-ccache:/ccache"],
+    ["--env", "CCACHE_DIR=/ccache"],
+    ["--env", "CCACHE_MAXSIZE=10G"],
+    ["--env", "CCACHE_COMPILERCHECK=content"],
+    ["--env", `CONVERT_LLVM_LTO=${process.env.CONVERT_LLVM_LTO ?? "1"}`],
     ["--env", `RECIPE=/recipes/${dirname(entry.build)}`],
     ["--env", `BUILD_SCRIPT=/recipes/${entry.build}`],
     ["--env", `SOURCE_URL=${entry.url ?? ""}`],

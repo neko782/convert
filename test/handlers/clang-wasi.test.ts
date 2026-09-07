@@ -9,6 +9,10 @@ test.each([
     "cpp",
     "#include <vector>\nint main() { std::vector<int> v{1,2}; return v.size(); }",
   ],
+  [
+    "cpp",
+    '#include <stdexcept>\nint main() { try { throw std::runtime_error("test"); } catch (const std::exception&) { return 0; } return 1; }',
+  ],
 ])(
   "%s → wasm with the cached Clang runtime",
   async (extension, source) => {

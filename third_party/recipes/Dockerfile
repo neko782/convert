@@ -4,6 +4,7 @@
 FROM emscripten/emsdk:6.0.9@sha256:96617f27fe16421588241def73908fd348a7f9d260440ed0d00b36dcf7a063cc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ccache \
     musl-tools \
     ninja-build \
     pkg-config \
