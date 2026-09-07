@@ -18,7 +18,6 @@ COPY package.json bun.lock .npmrc ./
 RUN bun install --frozen-lockfile --ignore-scripts
 
 COPY third_party ./third_party
-COPY scripts ./scripts
 COPY tools ./tools
 RUN bun run vendor
 
