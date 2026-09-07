@@ -5,7 +5,7 @@ import type {
   ConvertPathNode,
 } from "./FormatHandler.js";
 import handlers from "./handlers/index.js";
-import { TraversionGraph } from "./TraversionGraph.js";
+import { TraversionGraphWorkerClient } from "./TraversionGraphWorkerClient.js";
 import {
   CurrentPage,
   LoadingToolsText,
@@ -41,7 +41,7 @@ export const ConversionsFromAnyInput: ConvertPathNode[] = handlers
   );
 
 window.supportedFormatCache = new Map();
-window.traversionGraph = new TraversionGraph();
+window.traversionGraph = new TraversionGraphWorkerClient();
 
 window.printSupportedFormatCache = () => {
   const entries = [];
@@ -82,7 +82,7 @@ async function buildOptionList() {
     }
   }
 
-  window.traversionGraph.init(window.supportedFormatCache, handlers);
+  await window.traversionGraph.init(window.supportedFormatCache, handlers);
   LoadingToolsText.value = undefined;
 }
 
@@ -98,7 +98,12 @@ async function attemptConvertPath(
   for (const deadEnd of deadEndAttempts) {
     let isDeadEnd = true;
     for (let i = 0; i < deadEnd.length; i++) {
-      if (path[i] === deadEnd[i]) continue;
+      if (
+        path[i]?.handler.name === deadEnd[i].handler.name &&
+        path[i]?.format.mime === deadEnd[i].format.mime &&
+        path[i]?.format.format === deadEnd[i].format.format
+      )
+        continue;
       isDeadEnd = false;
       break;
     }
@@ -193,6 +198,7 @@ async function attemptConvertPath(
       ctx.log(`Step ${i + 1}/${totalSteps} complete`);
       if (files.some((c) => !c.bytes.length)) throw "Output is empty.";
     } catch (e) {
+      signal?.throwIfAborted();
       if (e instanceof DOMException && e.name === "AbortError") {
         throw e;
       }
@@ -206,7 +212,7 @@ async function attemptConvertPath(
 
       const deadEndPath = path.slice(0, i + 2);
       deadEndAttempts.push(deadEndPath);
-      window.traversionGraph.addDeadEndPath(path.slice(0, i + 2));
+      await window.traversionGraph.addDeadEndPath(deadEndPath);
 
       ctx.log(
         `Dead end: ${path[i].format.format} → ${path[i + 1].format.format}`,
@@ -230,11 +236,12 @@ window.tryConvertByTraversing = async function (
   signal?: AbortSignal,
 ) {
   deadEndAttempts = [];
-  window.traversionGraph.clearDeadEndPaths();
+  signal?.throwIfAborted();
   for await (const path of window.traversionGraph.searchPath(
     from,
     to,
     Mode.value === ModeEnum.Simple,
+    signal,
   )) {
     if (signal?.aborted) return null;
     if (path.at(-1)?.handler === to.handler) {
