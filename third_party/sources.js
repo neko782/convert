@@ -107,14 +107,15 @@ export default [
   {
     // Single-threaded ffmpeg.wasm core with zlib, libogg, libvorbis, LAME and x264.
     name: "ffmpeg-core",
-    url: "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n5.1.10.tar.gz",
-    sha256: "2bef2153333b2eaf04a9caefb419213dd8bd1885b7d591205164fd9c9e50415e",
+    url: "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz",
+    sha256: "cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635",
     sources: {
-      // ffmpeg.wasm's patched fftools and JavaScript bindings
+      // Single-threaded command layer, ported to the FFmpeg 9 library APIs.
       "ffmpeg-wasm": {
         url: "https://github.com/ffmpegwasm/ffmpeg.wasm/archive/f876f907c7e9b9bf51d4ed0b913a855a63ae63fc.tar.gz",
         sha256:
           "5191762afdd8fdbec457fd2650cc773fcebcfe1d5bcb7e5ee9584e1a78bd3d5b",
+        patches: ["ffmpeg-wasm-9.patch"],
       },
       zlib: {
         url: "https://zlib.net/zlib-1.3.2.tar.gz",

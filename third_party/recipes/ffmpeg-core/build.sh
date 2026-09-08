@@ -61,8 +61,8 @@ emmake make -j"$JOBS"
 W=../ffmpeg-wasm
 emcc $CFLAGS -I. -I"$W/src/fftools" $LDFLAGS \
   -Llibavcodec -Llibavdevice -Llibavfilter -Llibavformat -Llibavutil \
-  -Llibpostproc -Llibswresample -Llibswscale \
-  -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lpostproc -lswresample -lswscale \
+  -Llibswresample -Llibswscale \
+  -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswresample -lswscale \
   -lx264 -lmp3lame -lvorbisenc -lvorbis -logg -lz \
   -Wno-deprecated-declarations \
   -sENVIRONMENT=worker -sWASM_BIGINT -sSTACK_SIZE=5MB -sMODULARIZE -sEXPORT_ES6 \
