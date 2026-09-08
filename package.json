@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "vendor": "bun tools/vendor.js",
     "prebuilt": "bun tools/prebuilt.js",
+    "artifacts:check": "bun tools/check-artifacts.js",
     "dev": "bun run vendor && vite",
     "typecheck": "bun run vendor && tsc",
     "build": "bun run typecheck && vite build",
