@@ -2,25 +2,20 @@
 # YoWASP's LLVM/Clang/LLD toolchain compiled to WebAssembly, packaged for the
 # browser the same way as the @yowasp/clang npm package (gen/bundle.js plus the
 # wasm and resource files it loads). This is a full LLVM build: several hours.
-#
-# The checked-in artifacts.tar.gz is built by this recipe with LTO disabled.
+# OPT_LTO=1 enables LTO for the compiler executables (see the build patch).
 set -eu
-. /recipes/lib.sh
 
 CLANG_VERSION=23.1.0
 
-fetch_extract "$SOURCE_URL" "$SOURCE_SHA256" clang
-fetch_extract https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz \
-  ab1f0e3ec52448c33e8782eaf0422504b87c7b016b22514653ee0d8fcee479ff clang/llvm-src
-fetch_extract https://github.com/WebAssembly/wasi-libc/archive/ac020b86fd44bafe60aa4fa12f407d16e3731329.tar.gz \
-  d44bd7fa456aa42c1494767e5ffa00cdbab182d8497a577592a6562629f6f49e clang/wasi-libc-src
-fetch_extract https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz \
-  87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171 wasi-sdk
-
-cd clang
-patch -p1 < "$RECIPE/build.patch"
-patch --fuzz=0 -d llvm-src -p1 < "$RECIPE/llvm-wasi.patch"
-WASI_SDK_PATH="$PWD/../wasi-sdk" CMAKE_BUILD_PARALLEL_LEVEL="$JOBS" ./build.sh
+cd "$SRC/yowasp-clang"
+# Upstream tracks these as submodules; the archive contains them as empty
+# directories. Put the declared sources in their place.
+rmdir llvm-src wasi-libc-src
+mv "$SRC/llvm" llvm-src
+mv "$SRC/wasi-libc" wasi-libc-src
+# Upstream's script hides some errors (command substitutions with 2>&1);
+# run it traced so a failure shows where it happened.
+CONVERT_LLVM_LTO="$OPT_LTO" CMAKE_BUILD_PARALLEL_LEVEL="$JOBS" sh -ex ./build.sh
 
 # Upstream's package-npmjs.sh, with the version pinned instead of derived from
 # git metadata, and dependencies pinned by npmjs.bun.lock.

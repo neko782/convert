@@ -165,7 +165,7 @@ If your tool requires an external dependency (which it likely does), there are c
 
 - If it's an `npm` package, just install it to the project like you normally would.
 - If it's a Git repository, release archive or data file, add an entry to [third_party/sources.js](third_party/sources.js): a pinned archive URL, its SHA-256, optional patches (in `third_party/patches/`) and optionally which files to copy. `bun run vendor` places it under `third_party/generated/<name>/`; import the files from there.
-- If it has to be compiled (C/C++ to WebAssembly, a bundler run, ...), declare its URL, checksum, `build` script and `artifacts: true` in `third_party/sources.js`, add the recipe under `third_party/recipes/<name>/`, and check in the archive it produces. Use `artifacts: false` for shell recipes that should run during vendoring. See [third_party/recipes/README.md](third_party/recipes/README.md).
+- If it has to be compiled (C/C++ to WebAssembly, a bundler run, ...), declare every source archive with its checksum, the `build` script, and the toolchains it needs in [third_party/sources.js](third_party/sources.js). See [third_party/recipes/README.md](third_party/recipes/README.md).
 
 Do not commit prebuilt binaries into `src/`.
 

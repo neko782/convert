@@ -1,55 +1,152 @@
 // Compiles a dependency that needs a toolchain and stores the result as
-// third_party/recipes/<name>/artifacts.tar.gz, which is checked into Git and
+// third_party/prebuilt/<name>-<key>.tar.gz, which is checked into Git and
 // unpacked by tools/vendor.js. Nothing here runs during normal development.
 //
-// usage: bun tools/prebuilt.js [--check] <name>...
-//   <name>   a directory in third_party/recipes/ containing build.sh
-//   --check  build but do not write; fail if the result differs from the
-//            checked-in archive. Running a build and then --check verifies
-//            that the recipe is reproducible.
+// usage: bun tools/prebuilt.js [--check] [--plan] [--missing] <name>... | --all
+//   <name>     an artifact recipe declared in third_party/sources.js
+//   --all      every artifact recipe
+//   --missing  only recipes whose archive for the current key is absent
+//   --check    build but do not write; fail if the result differs from the
+//              checked-in archive. Running a build and then --check verifies
+//              that the recipe is reproducible.
+//   --plan     print the build plan instead of running it
+//   --trace    echo every command the recipe and toolchain setups run
 //
-// Recipes run in the toolchain image built from third_party/recipes/Dockerfile
-// (set CONVERT_TOOLCHAIN_IMAGE to use an already built image instead). Only the
-// recipe directory is mounted, read-only; downloads and compiler results are
-// cached in Docker volumes; the archive comes back on stdout (see run.sh).
-// Clear compiler results with: docker volume rm convert-prebuilt-ccache
+// The key names every input of the build (see tools/manifest.js). Editing a
+// recipe, patch, source, option, toolchain or the container changes the key,
+// and vendoring refuses to continue until the recipe has been rebuilt.
+//
+// Recipes run in the container built from third_party/recipes/Dockerfile (set
+// CONVERT_TOOLCHAIN_IMAGE to use an already built image; CONVERT_DOCKER_NETWORK
+// to pick a Docker network, e.g. host). third_party/ is mounted read-only; the
+// plan generated from the manifest is mounted at /plan.sh; downloads, toolchain
+// installations and compiler results live in Docker volumes shared by all
+// builds (see recipes/run.sh). Remove them with:
+//   docker volume rm convert-prebuilt-downloads convert-prebuilt-toolchains convert-prebuilt-ccache
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
+  mkdirSync,
+  mkdtempSync,
   openSync,
+  readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
-import sources from "../third_party/sources.js";
+import {
+  allSources,
+  artifactEntryName,
+  artifactPath,
+  entryKey,
+  entrySources,
+  patchesDir,
+  platform,
+  prebuiltDir,
+  recipesDir,
+  root,
+  sha256,
+  sources,
+  thirdParty,
+  toolchainKey,
+  toolchains,
+  toolchainsDir,
+} from "./manifest.js";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const recipesDir = join(root, "third_party/recipes");
-const platform = "linux/amd64";
 const network = process.env.CONVERT_DOCKER_NETWORK
   ? ["--network", process.env.CONVERT_DOCKER_NETWORK]
   : [];
 
 const args = process.argv.slice(2);
 const check = args.includes("--check");
+const planOnly = args.includes("--plan");
+const all = args.includes("--all");
+const missing = args.includes("--missing");
+const trace = args.includes("--trace");
 const names = args.filter((a) => !a.startsWith("--"));
-if (names.length === 0) {
-  console.error("usage: bun tools/prebuilt.js [--check] <name>...");
+for (const arg of args)
+  if (
+    arg.startsWith("--") &&
+    !["--check", "--plan", "--all", "--missing", "--trace"].includes(arg)
+  )
+    throw new Error(`unknown option ${arg}`);
+if (names.length === 0 && !all) {
+  console.error(
+    "usage: bun tools/prebuilt.js [--check] [--plan] [--missing] [--trace] <name>... | --all",
+  );
   process.exit(2);
 }
-for (const name of names) {
-  const entry = sources.find((entry) => entry.name === name);
-  if (!entry?.build || !entry.artifacts)
-    throw new Error(`no artifact recipe declared in sources.js: ${name}`);
+let entries = all
+  ? sources.filter((entry) => entry.artifacts)
+  : names.map((name) => {
+      const entry = sources.find((entry) => entry.name === name);
+      if (!entry?.build || !entry.artifacts)
+        throw new Error(`no artifact recipe declared in sources.js: ${name}`);
+      return entry;
+    });
+if (missing) {
+  entries = entries.filter((entry) => !existsSync(artifactPath(entry)));
+  if (entries.length === 0) {
+    console.log("prebuilt: every archive is present for its current key");
+    process.exit(0);
+  }
 }
 
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
+// Paths inside the container.
+const inContainer = (path) =>
+  "/third_party" + path.slice(thirdParty.length).replaceAll("\\", "/");
+const quote = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`;
+
+// The plan is a shell script over the steps defined in recipes/run.sh; it is
+// the manifest, resolved for one recipe.
+function plan(entry) {
+  const lines = [
+    `# ${entry.name} ${entryKey(entry)}`,
+    "# generated by tools/prebuilt.js from third_party/sources.js",
+  ];
+  for (const name of entry.toolchains ?? []) {
+    const toolchain = toolchains[name];
+    const key = toolchainKey(name);
+    lines.push(`if toolchain_missing ${quote(name)} ${key}; then`);
+    for (const [source, { url, sha256, strip = 1 }] of Object.entries(
+      allSources(name, toolchain),
+    ))
+      lines.push(
+        `  toolchain_source ${quote(source)} ${quote(url)} ${sha256} ${strip}`,
+      );
+    lines.push(
+      `  toolchain_setup ${quote(inContainer(join(toolchainsDir, toolchain.setup)))}`,
+      "fi",
+      `toolchain_use ${quote(name)} ${key}`,
+    );
+  }
+  for (const [name, { url, sha256, strip = 1, patches = [] }] of Object.entries(
+    entrySources(entry),
+  )) {
+    lines.push(`source_fetch ${quote(name)} ${quote(url)} ${sha256} ${strip}`);
+    for (const patch of patches)
+      lines.push(
+        `source_patch ${quote(name)} ${quote(inContainer(join(patchesDir, patch)))}`,
+      );
+  }
+  for (const [key, value] of Object.entries(entry.options ?? {}))
+    lines.push(`export OPT_${key}=${quote(value)}`);
+  lines.push(`build ${quote(inContainer(join(recipesDir, entry.build)))}`);
+  return lines.join("\n") + "\n";
+}
+
+if (planOnly) {
+  for (const entry of entries) process.stdout.write(plan(entry) + "\n");
+  process.exit(0);
+}
 
 const container = `convert-prebuilt-${randomUUID()}`;
 
@@ -94,58 +191,77 @@ if (!image) {
   ]);
 }
 
+const scratch = mkdtempSync(join(tmpdir(), "prebuilt-"));
 let failed = false;
-for (const name of names) {
-  const entry = sources.find((entry) => entry.name === name);
-  const archive = join(recipesDir, name, "artifacts.tar.gz");
-  const fresh = archive + ".new";
-  console.log(`prebuilt: building ${name}`);
-  const options = [
-    ["--init", "--name", container],
-    ["--platform", platform],
-    network,
-    ["--volume", `${recipesDir}:/recipes:ro`],
-    ["--volume", "convert-prebuilt-downloads:/downloads"],
-    ["--volume", "convert-prebuilt-ccache:/ccache"],
-    ["--env", "CCACHE_DIR=/ccache"],
-    ["--env", "CCACHE_MAXSIZE=10G"],
-    ["--env", "CCACHE_COMPILERCHECK=content"],
-    ["--env", `CONVERT_LLVM_LTO=${process.env.CONVERT_LLVM_LTO ?? "1"}`],
-    ["--env", `RECIPE=/recipes/${dirname(entry.build)}`],
-    ["--env", `BUILD_SCRIPT=/recipes/${entry.build}`],
-    ["--env", `SOURCE_URL=${entry.url ?? ""}`],
-    ["--env", `SOURCE_SHA256=${entry.sha256 ?? ""}`],
-    ["--env", "OUT=/out"],
-    ["--env", "DOWNLOADS=/downloads"],
-    ["--workdir", "/build"],
-  ].flat();
-  const fd = openSync(fresh, "w");
-  try {
-    await docker(
-      ["run", "--rm", ...options, image, "sh", "/recipes/run.sh"],
-      fd,
-    );
-  } catch (error) {
+try {
+  for (const entry of entries) {
+    const key = entryKey(entry);
+    const archive = artifactPath(entry, key);
+    const fresh = archive + ".new";
+    const planFile = join(scratch, `${entry.name}.sh`);
+    writeFileSync(planFile, plan(entry));
+    console.log(`prebuilt: building ${entry.name} (${key})`);
+    const options = [
+      ["--init", "--name", container],
+      ["--platform", platform],
+      network,
+      ["--volume", `${thirdParty}:/third_party:ro`],
+      ["--volume", `${planFile}:/plan.sh:ro`],
+      ["--volume", "convert-prebuilt-downloads:/downloads"],
+      ["--volume", "convert-prebuilt-toolchains:/toolchains"],
+      ["--volume", "convert-prebuilt-ccache:/ccache"],
+      ["--env", "DOWNLOADS=/downloads"],
+      ["--env", "TOOLCHAINS=/toolchains"],
+      ["--env", "CCACHE_DIR=/ccache"],
+      ["--env", "CCACHE_MAXSIZE=10G"],
+      ["--env", "CCACHE_COMPILERCHECK=content"],
+      trace ? ["--env", "TRACE=1"] : [],
+      ["--workdir", "/build"],
+    ].flat();
+    mkdirSync(prebuiltDir, { recursive: true });
+    const fd = openSync(fresh, "w");
+    try {
+      await docker(
+        ["run", "--rm", ...options, image, "sh", "/third_party/recipes/run.sh"],
+        fd,
+      );
+    } catch (error) {
+      closeSync(fd);
+      unlinkSync(fresh);
+      throw error;
+    }
     closeSync(fd);
-    unlinkSync(fresh);
-    throw error;
-  }
-  closeSync(fd);
 
-  const before = existsSync(archive) ? sha256(readFileSync(archive)) : null;
-  const after = sha256(readFileSync(fresh));
-  const same = before === after;
-  if (check) {
-    unlinkSync(fresh);
-    console.log(
-      `prebuilt: ${name} ${same ? "reproduced the checked-in archive" : "DIFFERS from the checked-in archive"}`,
-    );
-    failed ||= !same;
-  } else {
-    renameSync(fresh, archive);
-    console.log(
-      `prebuilt: ${name} -> third_party/recipes/${name}/artifacts.tar.gz (${same ? "unchanged" : "updated"})`,
-    );
+    const before = existsSync(archive) ? sha256(readFileSync(archive)) : null;
+    const after = sha256(readFileSync(fresh));
+    const same = before === after;
+    if (check) {
+      unlinkSync(fresh);
+      console.log(
+        `prebuilt: ${entry.name} ${
+          before === null
+            ? "has no checked-in archive for this key"
+            : same
+              ? "reproduced the checked-in archive"
+              : "DIFFERS from the checked-in archive"
+        }`,
+      );
+      failed ||= !same;
+    } else {
+      renameSync(fresh, archive);
+      // Archives for previous keys are obsolete.
+      for (const file of readdirSync(prebuiltDir))
+        if (
+          artifactEntryName(file) === entry.name &&
+          file !== basename(archive)
+        )
+          rmSync(join(prebuiltDir, file));
+      console.log(
+        `prebuilt: ${entry.name} -> ${relative(root, archive)} (${same ? "unchanged" : "updated"})`,
+      );
+    }
   }
+} finally {
+  rmSync(scratch, { recursive: true, force: true });
 }
 process.exit(failed ? 1 : 0);

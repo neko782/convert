@@ -1,6 +1,5 @@
 // Download, verify and prepare the entries declared in third_party/sources.js.
 // Usage: bun tools/vendor.js [--force]
-import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -12,37 +11,46 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
-import sources from "../third_party/sources.js";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const generated = join(root, "third_party/generated");
-const patchesDir = join(root, "third_party/patches");
-const recipesDir = join(root, "third_party/recipes");
+import {
+  artifactEntryName,
+  artifactPath,
+  entryKey,
+  entrySources,
+  outputDir,
+  patchesDir,
+  prebuiltDir,
+  recipeDir,
+  recipesDir,
+  root,
+  sha256,
+  sources,
+  thirdParty,
+} from "./manifest.js";
+
+const generated = join(thirdParty, "generated");
 const downloadCache = join(root, ".cache/vendor");
 const force = process.argv.includes("--force");
 
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
-
-function run(cmd, args, cwd) {
+function run(cmd, args, cwd, env = {}) {
   const result = spawnSync(cmd, args, {
     cwd,
     stdio: "inherit",
-    env: { ...process.env, BUN: process.execPath },
+    env: { ...process.env, BUN: process.execPath, ...env },
   });
   if (result.error) throw result.error;
   if (result.status !== 0)
     throw new Error(`${cmd} ${args.join(" ")} failed (exit ${result.status})`);
 }
 
-// Directories are rebuilt from scratch whenever their fingerprint changes.
-function upToDate(dest, fingerprint) {
+// Directories are rebuilt from scratch whenever their key changes.
+function upToDate(dest, key) {
   if (force) return false;
   const stamp = join(dest, ".vendored");
-  return existsSync(stamp) && readFileSync(stamp, "utf8") === fingerprint;
+  return existsSync(stamp) && readFileSync(stamp, "utf8") === key;
 }
 
 function fresh(dest) {
@@ -50,8 +58,8 @@ function fresh(dest) {
   mkdirSync(dest, { recursive: true });
 }
 
-function stamp(dest, fingerprint) {
-  writeFileSync(join(dest, ".vendored"), fingerprint);
+function stamp(dest, key) {
+  writeFileSync(join(dest, ".vendored"), key);
 }
 
 async function download(url, expected) {
@@ -74,6 +82,7 @@ async function download(url, expected) {
 }
 
 async function extract(archive, dir, strip) {
+  mkdirSync(dir, { recursive: true });
   if (!archive.endsWith(".zip")) {
     run("tar", ["-xzf", archive, "-C", dir, `--strip-components=${strip}`]);
     return;
@@ -89,67 +98,70 @@ async function extract(archive, dir, strip) {
   }
 }
 
-async function vendor(entry) {
-  const dest = entry.output
-    ? join(root, entry.output)
-    : join(generated, entry.name);
-  const patches = (entry.patches ?? []).map((p) => join(patchesDir, p));
-  const fingerprint = JSON.stringify([
-    entry,
-    patches.map((p) => sha256(readFileSync(p))),
-    entry.build
-      ? recipeFingerprint(dirname(join(recipesDir, entry.build)))
-      : null,
-  ]);
-  if (upToDate(dest, fingerprint)) return;
+// Extract and patch every source of an entry into <scratch>/<source name>.
+async function prepareSources(entry, scratch) {
+  for (const [name, source] of Object.entries(entrySources(entry))) {
+    const dir = join(scratch, name);
+    await extract(
+      await download(source.url, source.sha256),
+      dir,
+      source.strip ?? 1,
+    );
+    for (const patch of source.patches ?? [])
+      run(
+        "git",
+        ["apply", "-p1", "--whitespace=nowarn", join(patchesDir, patch)],
+        dir,
+      );
+  }
+}
 
-  const archive = await download(entry.url, entry.sha256);
+async function vendor(entry) {
+  const dest = outputDir(entry);
+  const key = entryKey(entry);
+  if (upToDate(dest, key)) return;
+
   const scratch = mkdtempSync(join(tmpdir(), "vendor-"));
   try {
-    await extract(archive, scratch, entry.strip ?? 1);
-    for (const patch of patches) {
-      run("git", ["apply", "-p1", "--whitespace=nowarn", patch], scratch);
-    }
+    await prepareSources(entry, scratch);
     fresh(dest);
     if (entry.build) {
-      run("sh", [join(recipesDir, entry.build), scratch, dest], root);
-    } else
+      run("sh", [join(recipesDir, entry.build)], root, {
+        SRC: scratch,
+        OUT: dest,
+        RECIPE: recipeDir(entry),
+      });
+    } else {
       for (const [from, to] of Object.entries(entry.copy ?? { ".": "." })) {
         const target = join(dest, to);
         mkdirSync(dirname(target), { recursive: true });
-        cpSync(join(scratch, from), target, { recursive: true });
+        cpSync(join(scratch, entry.name, from), target, { recursive: true });
       }
+    }
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-  stamp(dest, fingerprint);
-  console.log(`vendor: ${entry.name} <- ${basename(entry.url)}`);
-}
-
-function recipeFingerprint(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((entry) => [
-      entry.name,
-      entry.isDirectory()
-        ? recipeFingerprint(join(dir, entry.name))
-        : sha256(readFileSync(join(dir, entry.name))),
-    ]);
+  stamp(dest, key);
+  console.log(
+    `vendor: ${entry.name} <- ${Object.keys(entrySources(entry)).join(", ")}`,
+  );
 }
 
 function unpackArtifacts(entry) {
-  const archive = join(recipesDir, entry.name, "artifacts.tar.gz");
-  const dest = entry.output
-    ? join(root, entry.output)
-    : join(generated, entry.name);
-  const fingerprint = JSON.stringify([entry, sha256(readFileSync(archive))]);
-  if (upToDate(dest, fingerprint)) return;
+  const key = entryKey(entry);
+  const archive = artifactPath(entry, key);
+  if (!existsSync(archive))
+    throw new Error(
+      `vendor: ${entry.name}: no artifacts for key ${key}. ` +
+        `Its inputs changed since the checked-in archive was built; ` +
+        `run \`bun run prebuilt ${entry.name}\` and commit ${relative(root, archive)}.`,
+    );
+  const dest = outputDir(entry);
+  if (upToDate(dest, key)) return;
   fresh(dest);
   run("tar", ["-xzf", archive, "-C", dest]);
-  stamp(dest, fingerprint);
-  console.log(
-    `vendor: ${entry.name} <- recipes/${entry.name}/artifacts.tar.gz`,
-  );
+  stamp(dest, key);
+  console.log(`vendor: ${entry.name} <- ${relative(root, archive)}`);
 }
 
 for (const entry of sources) {
@@ -157,9 +169,20 @@ for (const entry of sources) {
   else await vendor(entry);
 }
 
+// Archives in prebuilt/ that no artifact recipe refers to any more.
+const current = new Set(
+  sources
+    .filter((entry) => entry.artifacts)
+    .map((entry) => artifactPath(entry)),
+);
+for (const file of readdirSync(prebuiltDir))
+  if (artifactEntryName(file) && !current.has(join(prebuiltDir, file)))
+    console.warn(`vendor: stale archive third_party/prebuilt/${file}`);
+
 const wanted = new Set(
   sources.filter((entry) => !entry.output).map((entry) => entry.name),
 );
+mkdirSync(generated, { recursive: true });
 for (const name of readdirSync(generated)) {
   if (!wanted.has(name)) {
     rmSync(join(generated, name), { recursive: true, force: true });

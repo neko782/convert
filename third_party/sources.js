@@ -1,13 +1,20 @@
-// Pinned third-party sources consumed by tools/vendor.js and tools/prebuilt.js.
+// Pinned third-party inputs consumed by tools/vendor.js and tools/prebuilt.js.
+// Every download that a build needs is declared here with its checksum; the
+// toolchains recipes compile with are declared in toolchains.js.
+//
 // name: directory under generated/; output: optional repository-relative override.
-// url / sha256: source archive and checksum (url: null for local-only recipes).
-// strip: archive components to remove (default 1).
-// patches: paths under patches/, applied in order; copy: source/output mapping.
-// build: script under recipes/. With artifacts: true, runs in the Docker
-// toolchain on explicit rebuild and vendor unpacks recipes/<name>/artifacts.tar.gz.
-// With artifacts: false, runs with sh during vendoring, receiving source and
-// output directories as arguments. Recipe directory contents invalidate its cache.
-// Omit build for sources that only need extracting, patching and copying.
+// url, sha256: the main archive; strip: archive components to remove (default
+//   1); patches: files under patches/, applied in order. Recipes find it
+//   extracted at $SRC/<name>.
+// sources: additional archives with the same fields, by name, at $SRC/<source name>.
+// copy: source/output mapping for entries that are only extracted (default all).
+// build: script under recipes/. With artifacts: true it runs in the Docker
+//   container (tools/prebuilt.js) with the listed toolchains and options, and
+//   vendoring unpacks prebuilt/<name>-<key>.tar.gz, where <key> covers sources,
+//   patches, recipe directory, toolchain identities, platform, container and
+//   options. Without artifacts, the script runs with sh during vendoring.
+// toolchains: names from toolchains.js (artifact recipes only).
+// options: string values passed to the recipe as OPT_<NAME> (artifact recipes only).
 
 export default [
   {
@@ -92,15 +99,52 @@ export default [
     name: "7z-wasm",
     url: "https://github.com/ip7z/7zip/archive/refs/tags/26.03.tar.gz",
     sha256: "74b11efd8559f9b3dc652e89dc8ebdf4acb66e514a745e44cf75582cdf4512fd",
+    patches: ["7z-wasm-emscripten.patch"],
     build: "7z-wasm/build.sh",
     artifacts: true,
+    toolchains: ["emscripten"],
   },
   {
+    // Single-threaded ffmpeg.wasm core with zlib, libogg, libvorbis, LAME and x264.
     name: "ffmpeg-core",
     url: "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n5.1.10.tar.gz",
     sha256: "2bef2153333b2eaf04a9caefb419213dd8bd1885b7d591205164fd9c9e50415e",
+    sources: {
+      // ffmpeg.wasm's patched fftools and JavaScript bindings
+      "ffmpeg-wasm": {
+        url: "https://github.com/ffmpegwasm/ffmpeg.wasm/archive/f876f907c7e9b9bf51d4ed0b913a855a63ae63fc.tar.gz",
+        sha256:
+          "5191762afdd8fdbec457fd2650cc773fcebcfe1d5bcb7e5ee9584e1a78bd3d5b",
+      },
+      zlib: {
+        url: "https://zlib.net/zlib-1.3.2.tar.gz",
+        sha256:
+          "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+      },
+      ogg: {
+        url: "https://downloads.xiph.org/releases/ogg/libogg-1.3.6.tar.xz",
+        sha256:
+          "5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061",
+      },
+      vorbis: {
+        url: "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz",
+        sha256:
+          "b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b",
+      },
+      lame: {
+        url: "https://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
+        sha256:
+          "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
+      },
+      x264: {
+        url: "https://github.com/mirror/x264/archive/c24e06c2e184345ceb33eb20a15d1024d9fd3497.tar.gz",
+        sha256:
+          "090d730e867fc63631782a1287974635d1237d0fa7c6fd1d09fd543620a56689",
+      },
+    },
     build: "ffmpeg-core/build.sh",
     artifacts: true,
+    toolchains: ["emscripten"],
   },
   {
     name: "libopenmpt",
@@ -108,30 +152,52 @@ export default [
     sha256: "9273b88b67973cc69e54d748ab1b749399d6d07695f1c37d0c59f88b4106074f",
     build: "libopenmpt/build.sh",
     artifacts: true,
+    toolchains: ["emscripten"],
   },
   {
     name: "turbowarp-packager-browser",
     url: "https://github.com/TurboWarp/packager/archive/9a4854b238c5ebfe9ccbbda486382a673c85cd38.tar.gz",
     sha256: "95bebe471a9c7316961526f230ef23d4bd0a37901eb063c543e859c5e35823c6",
+    patches: ["turbowarp-packager-browser-build.patch"],
     build: "turbowarp-packager-browser/build.sh",
   },
   {
+    // YoWASP's LLVM/Clang/LLD compiled to WebAssembly. A full LLVM build: hours.
     name: "yowasp-clang",
     url: "https://github.com/YoWASP/clang/archive/944dd7c774954180e621cc8e12984023a7f8bcbe.tar.gz",
     sha256: "518e20345ca6d834074fcc7314b38ec9ff25ef51ccd2588fff66c262418c61e2",
+    patches: ["yowasp-clang-build.patch"],
+    sources: {
+      llvm: {
+        url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz",
+        sha256:
+          "ab1f0e3ec52448c33e8782eaf0422504b87c7b016b22514653ee0d8fcee479ff",
+        patches: ["yowasp-clang-llvm-wasi.patch"],
+      },
+      "wasi-libc": {
+        url: "https://github.com/WebAssembly/wasi-libc/archive/ac020b86fd44bafe60aa4fa12f407d16e3731329.tar.gz",
+        sha256:
+          "d44bd7fa456aa42c1494767e5ffa00cdbab182d8497a577592a6562629f6f49e",
+      },
+    },
     build: "yowasp-clang/build.sh",
     artifacts: true,
+    // node: @bytecodealliance/jco (used by upstream's packaging) needs Node APIs Bun lacks.
+    toolchains: ["wasi-sdk", "bun", "node"],
+    // LTO shrinks the compiler but multiplies link time; the checked-in
+    // artifacts are built without it.
+    options: { LTO: "1" },
   },
   {
     name: "batToExe",
-    url: null,
     build: "batToExe/build.sh",
     artifacts: true,
+    toolchains: ["llvm-mingw"],
   },
   {
     name: "shToElf",
-    url: null,
     build: "shToElf/build.sh",
     artifacts: true,
+    toolchains: ["zig"],
   },
 ];

@@ -1,0 +1,150 @@
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -13,6 +13,8 @@
+     "build-standalone-prod": "cross-env NODE_ENV=production npm run build-standalone",
+     "build-node": "cross-env BUILD_MODE=node npm run build",
+     "build-node-prod": "cross-env NODE_ENV=production npm run build-node",
++    "build-browser": "cross-env BUILD_MODE=browser npm run build",
++    "build-browser-prod": "cross-env NODE_ENV=production BUILD_MODE=browser npm run build",
+     "test": "jest",
+     "prepublishOnly": "npm run test && npm run build-node-prod && node src/build/nodejs/update-readme.js node",
+     "postpublish": "node src/build/nodejs/update-readme.js restore"
+diff --git a/webpack.config.js b/webpack.config.js
+--- a/webpack.config.js
++++ b/webpack.config.js
+@@ -131,1 +131,56 @@
++const makeBrowserPackage = () => ({
++  ...base,
++  devtool: isProduction ? '' : 'source-map',
++  output: {
++    filename: 'packager.browser.js',
++    path: dist,
++    library: 'TurboWarpPackager',
++    libraryTarget: 'umd',
++    globalObject: 'this'
++  },
++  entry: './src/packager/web/export.js',
++  resolve: {
++    mainFields: ['browser', 'module', 'main']
++  },
++  optimization: {
++    splitChunks: false,
++    runtimeChunk: false
++  },
++  module: {
++    rules: [
++      {
++        test: /\.jsx?$/,
++        loader: 'babel-loader',
++        include: [
++          path.resolve(__dirname, 'src')
++        ],
++        options: {
++          babelrc: false,
++          presets: ['@babel/preset-env']
++        }
++      },
++      {
++        test: /\.png|\.svg$/i,
++        use: [{
++          loader: 'url-loader'
++        }]
++      }
++    ]
++  },
++  plugins: [
++    ...commonFrontendPlugins(),
++    new CopyWebpackPlugin({
++      patterns: [
++        {from: 'src/packager/web/export.d.ts', to: 'packager.browser.d.ts'},
++        {from: 'LICENSE'}
++      ]
++    }),
++    new EagerDynamicImportPlugin(),
++    new webpack.optimize.LimitChunkCountPlugin({
++      maxChunks: 1
++    }),
++    ...(process.env.BUNDLE_ANALYZER === 'browser-package' ? [new BundleAnalyzerPlugin()] : [])
++  ]
++});
++
+ const makeWebsite = () => ({
+@@ -243,9 +298,11 @@
+ module.exports = [
+   makeScaffolding({full: true}),
+   makeScaffolding({full: false}),
++  makeBrowserPackage(),
+   ...(process.env.BUILD_MODE === 'node' ? [
+     makeNode()
++  ] : process.env.BUILD_MODE === 'browser' ? [
+   ] : [
+     makeWebsite()
+   ])
+ ];
+diff --git a/src/packager/web/export.js b/src/packager/web/export.js
+--- a/src/packager/web/export.js
++++ b/src/packager/web/export.js
+@@ -1,7 +1,17 @@
+ import {setAdapter} from '../adapter';
+ import Packager from '../packager';
++import loadProject from '../load-project';
++import {downloadProject} from '../download-project';
++import largeAssets from '../large-assets';
+ import WebAdapter from './adapter';
+ 
+ setAdapter(new WebAdapter());
+ 
++export {
++  Packager,
++  loadProject,
++  downloadProject,
++  largeAssets
++};
++
+ export default Packager;
+diff --git a/src/packager/web/export.d.ts b/src/packager/web/export.d.ts
+new file mode 100644
+--- /dev/null
++++ b/src/packager/web/export.d.ts
+@@ -0,0 +1,40 @@
++// The browser API consumed by src/handlers/turbowarp.ts.
++export interface Project {
++  type: string;
++  analysis: object;
++  [key: string]: unknown;
++}
++
++export function downloadProject(data: Uint8Array): Promise<Project>;
++
++export const loadProject: {
++  fromFile(
++    file: Blob,
++    progressCallback: (...args: unknown[]) => void,
++  ): Promise<{
++    promise: Promise<Project>;
++    terminate(): void;
++  }>;
++};
++
++export const largeAssets: Record<
++  string,
++  {
++    src: string | string[];
++    sha256?: string;
++    estimatedSize?: number;
++    useBuildId?: boolean;
++  }
++>;
++
++export class Packager {
++  project: Project;
++  options: { target: string; [key: string]: unknown };
++  package(): Promise<{
++    data: Uint8Array;
++    type: string;
++    filename: string;
++  }>;
++}
++
++export default Packager;

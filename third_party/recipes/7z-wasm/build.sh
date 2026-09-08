@@ -1,11 +1,7 @@
 #!/bin/sh
 set -eu
-. /recipes/lib.sh
 
-fetch_extract "$SOURCE_URL" "$SOURCE_SHA256" 7zip
-cd 7zip
-patch -p1 < "$RECIPE/emscripten.patch"
-
+cd "$SRC/7z-wasm"
 make -C CPP/7zip/Bundles/Alone2 -j"$JOBS" -f makefile.emcc \
   CC=emcc CXX=em++ AR=emar ST_MODE=1 \
   LDFLAGS_EMCC="-O2 -sDEFAULT_TO_CXX=1 -lnodefs.js -lworkerfs.js \
