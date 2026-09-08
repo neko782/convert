@@ -1,2 +1,7 @@
 # Patches must match the LF line endings in downloaded source archives.
 *.patch text eol=lf
+
+# Artifact keys hash recipe and toolchain bytes on every host. Keep text inputs
+# identical to the Linux build inputs, and shell scripts executable in Docker.
+third_party/recipes/** text=auto eol=lf
+third_party/toolchains/** text=auto eol=lf
